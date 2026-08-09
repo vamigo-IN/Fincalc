@@ -15,7 +15,10 @@ import { wireToPaise, type Paise } from '../../engines/money.js'
 export const sipRouter: Router = Router()
 
 /** Money arrives as a string of integer paise (07 §2). A number is tolerated on input. */
-const paise = z.union([z.string().regex(/^-?\d+$/), z.number().int(), z.bigint()]).transform(wireToPaise)
+const paiseInput = z.union([z.string().regex(/^-?\d+$/), z.number().int(), z.bigint()])
+const paise = paiseInput.transform(wireToPaise)
+/** See the note in goals.routes.ts: a default must be in WIRE shape, not bigint. */
+const paiseOr0 = paiseInput.default('0').transform(wireToPaise)
 
 const escalationSchema = z
   .discriminatedUnion('type', [
@@ -30,7 +33,7 @@ const bodySchema = z
     mode: z.enum(['project', 'required']).default('required'),
     targetPaise: paise.optional(),
     contributionPaise: paise.optional(),
-    lumpsumPaise: paise.default(0n as unknown as never),
+    lumpsumPaise: paiseOr0,
     frequency: z.enum(['daily', 'weekly', 'fortnightly', 'monthly', 'quarterly']).default('monthly'),
     timing: z.enum(['due', 'immediate']).default('due'),
     escalation: escalationSchema,

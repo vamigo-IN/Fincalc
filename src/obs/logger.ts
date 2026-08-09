@@ -48,12 +48,25 @@ export const logger = pino({
     : { transport: { target: 'pino/file', options: { destination: 1 } } }),
 })
 
-/** IPv4 → /24, IPv6 → /48. Never store a full client address (10 §9.4). */
+/**
+ * Truncate a client address to its network prefix — IPv4 to /24, IPv6 to /48 —
+ * so it is enough to spot a brute-force from a subnet and not enough to track an
+ * individual (docs 10 §9.4).
+ *
+ * Returned WITHOUT a CIDR suffix. The columns are Postgres `INET`, and Prisma's
+ * connector parses that as a bare address: passing "172.22.0.0/24" fails with
+ * `AddrParseError(Ip)`. Zeroing the trailing octets is the anonymisation; the
+ * suffix was only ever cosmetic.
+ */
 export function ipPrefix(ip: string | undefined): string | undefined {
   if (!ip) return undefined
   const clean = ip.replace(/^::ffff:/, '')
-  if (clean.includes(':')) return clean.split(':').slice(0, 3).join(':') + '::/48'
+  if (clean.includes(':')) {
+    const groups = clean.split(':').filter(Boolean).slice(0, 3)
+    if (groups.length < 3) return undefined
+    return `${groups.join(':')}::`
+  }
   const parts = clean.split('.')
   if (parts.length !== 4) return undefined
-  return `${parts[0]}.${parts[1]}.${parts[2]}.0/24`
+  return `${parts[0]}.${parts[1]}.${parts[2]}.0`
 }

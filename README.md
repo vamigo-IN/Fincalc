@@ -70,7 +70,13 @@ npm run dev                   # tsx watch, loads .env
 | **FX rate service** — Redis cache, single-flight, cooldown | ✅ |
 | Prisma schema — 44 tables, 39 enums | ✅ migrates clean |
 | `uuidv7()` + `next_sync_rev()` | ✅ |
-| Auth, sync, goals, budget, dashboard, advisor | ⛔ not started |
+| **Auth** — register, login, refresh rotation + reuse detection, /me | ✅ verified end to end |
+| **Tenancy** — Prisma extension, fail-closed on unclassified models | ✅ cross-tenant tests pass |
+| **Goals** — CRUD, free-tier cap, soft delete + tombstone, projection | ✅ |
+| **Rate limiting** — Redis, per bucket | ✅ |
+| **Admin dashboard** — `/admin`, server-rendered | ✅ users, entitlements, rules, flags, system |
+| Sync, budget, net worth, dashboard, advisor | ⛔ not started |
+| Flutter integration | ⛔ not started |
 
 The API is deliberately **narrow and deep** rather than wide and hollow: two real features that work end
 to end, on foundations the rest can be built on.
@@ -139,10 +145,24 @@ test/golden/sip.test.ts        23 vectors, independently recomputed
 
 | Method | Path | Auth |
 |---|---|---|
-| GET | `/v1/health` | public — liveness, touches nothing |
-| GET | `/v1/health/ready` | public — checks Redis; 503 when degraded |
+| GET | `/v1/health` · `/v1/health/ready` | public |
+| POST | `/v1/auth/register` · `login` · `refresh` · `logout` · `logout-all` | public / user |
+| GET | `/v1/me` | user |
+| GET·POST | `/v1/goals` | user |
+| GET·PATCH·DELETE | `/v1/goals/:id` | user |
+| GET | `/v1/goals/:id/projection` | user |
 | GET | `/v1/reference/rates?base=INR&symbols=USD,EUR` | guest |
 | POST | `/v1/calculators/sip/compute` | guest |
+| GET | `/admin` | admin session cookie |
+
+### Admin dashboard
+
+`http://127.0.0.1:8087/admin` — server-rendered, no build step. Sign in with an account whose email is
+in `ADMIN_EMAILS`. It manages users and entitlements (grant/revoke premium), advisor rules (pause is a
+live kill switch, no deploy), feature flags with rollout %, and a system page showing FX cache age,
+the daily upstream call count, applied migrations and the active tax ruleset.
+
+Every mutation writes an `audit_log` row with the admin's id.
 
 ```bash
 # "How much must I invest?" — the default mode

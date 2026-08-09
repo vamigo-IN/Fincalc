@@ -119,6 +119,12 @@ services:
       REDIS_URL: redis://fincalc_redis:6379
       EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      PASSWORD_PEPPER: ${PASSWORD_PEPPER:?set PASSWORD_PEPPER in .env}
+      AUDIT_PEPPER: ${AUDIT_PEPPER:?set AUDIT_PEPPER in .env}
+      JWT_SIGNING_KEYS: ${JWT_SIGNING_KEYS:-}
+      JWT_CURRENT_KID: ${JWT_CURRENT_KID:-k1}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      BCRYPT_COST: ${BCRYPT_COST:-11}
     ports:
       # Loopback only. The host's existing reverse proxy fronts this (docs 09 §2).
       - "127.0.0.1:8087:8087"

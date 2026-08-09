@@ -46,6 +46,42 @@ const schema = z.object({
 
   REQUEST_TIMEOUT_MS: z.coerce.number().int().default(15_000),
   BODY_LIMIT: z.string().default('256kb'),
+
+  // ── auth ───────────────────────────────────────────────────────────────────
+  /**
+   * Ed25519 signing keys as {"kid":"<base64 pkcs8>"}. Two are live at a time:
+   * the current one signs, the previous only verifies (docs 10 §3.1).
+   * In development a throwaway pair is generated at boot with a loud warning.
+   */
+  JWT_SIGNING_KEYS: z.string().optional(),
+  JWT_CURRENT_KID: z.string().default('k1'),
+  JWT_ISSUER: z.string().default('https://api.fincalc.app'),
+  JWT_AUDIENCE: z.string().default('fincalc-app'),
+  ACCESS_TOKEN_TTL_S: z.coerce.number().int().default(15 * 60),
+  REFRESH_TOKEN_TTL_S: z.coerce.number().int().default(30 * 24 * 3600),
+
+  /**
+   * HMAC'd into the password before bcrypt. Lives in the environment, never the
+   * database, so a stolen backup alone cannot crack the hashes.
+   * NEVER rotate: it invalidates every hash (docs 10 §9.3).
+   */
+  PASSWORD_PEPPER: z.string().min(16).optional(),
+  /** hmac_sha256(user_id, …) for audit rows that must survive DPDP erasure. */
+  AUDIT_PEPPER: z.string().min(16).optional(),
+
+  /**
+   * Measured, not guessed (docs 10 §4): pick the highest cost under ~250 ms on
+   * production hardware. bcryptjs is pure JS and ~3× slower than the native
+   * binding, so cost 11 here (~155 ms) is comparable work to native cost 12.
+   * Login is the endpoint an attacker floods — too slow is a self-inflicted DoS.
+   */
+  BCRYPT_COST: z.coerce.number().int().min(8).max(15).default(11),
+
+  MAX_DEVICES_PER_USER: z.coerce.number().int().default(5),
+  FREE_TIER_GOAL_LIMIT: z.coerce.number().int().default(3),
+
+  /** Comma-separated emails granted the admin claim. */
+  ADMIN_EMAILS: z.string().default(''),
 })
 
 const parsed = schema.safeParse(process.env)
@@ -59,11 +95,31 @@ if (!parsed.success) {
   process.exit(1)
 }
 
+const isProd = parsed.data.NODE_ENV === 'production'
+
+// Secrets that are mandatory in production but may be absent in development.
+// Failing here rather than at first use means a misconfigured deploy never
+// starts, instead of serving traffic and only breaking at the login endpoint.
+if (isProd) {
+  const missing = (['JWT_SIGNING_KEYS', 'PASSWORD_PEPPER', 'AUDIT_PEPPER'] as const).filter(
+    (k) => !parsed.data[k],
+  )
+  if (missing.length) {
+    console.error(`\nFinCalc API cannot start in production without: ${missing.join(', ')}\n`)
+    process.exit(1)
+  }
+}
+
 export const config = Object.freeze({
   ...parsed.data,
-  isProd: parsed.data.NODE_ENV === 'production',
+  isProd,
   isTest: parsed.data.NODE_ENV === 'test',
   fxFreshMs: parsed.data.FX_FRESH_MINUTES * 60 * 1000,
+  adminEmails: new Set(
+    parsed.data.ADMIN_EMAILS.split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  ),
 })
 
 export type Config = typeof config

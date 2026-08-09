@@ -3,10 +3,15 @@ import helmet from 'helmet'
 import { config } from './config.js'
 import { logger } from './obs/logger.js'
 import { connectRedis, redis, redisHealthy } from './db/redis.js'
+import { connectPrisma, prismaHealthy, unsafeSystemClient } from './db/prisma.js'
+import { initSigningKeys } from './modules/auth/crypto.js'
 import { requestId, ok, errorHandler, notFound, installBigIntSerialiser } from './http/envelope.js'
 import { fxRouter } from './modules/reference/fx.routes.js'
 import { sipRouter } from './modules/calculators/sip.routes.js'
 import { upstreamCallsToday } from './modules/reference/fx.service.js'
+import { authRouter, meRouter } from './modules/auth/auth.routes.js'
+import { goalsRouter } from './modules/goals/goals.routes.js'
+import { adminRouter } from './modules/admin/admin.routes.js'
 
 installBigIntSerialiser()
 
@@ -37,14 +42,21 @@ app.use(requestId)
 app.get('/v1/health', (_req, res) => ok(res, { status: 'ok' }))
 
 app.get('/v1/health/ready', async (_req, res) => {
-  const checks = { redis: redisHealthy() }
+  const checks = { redis: redisHealthy(), postgres: prismaHealthy() }
   const healthy = Object.values(checks).every(Boolean)
   ok(res, { status: healthy ? 'ready' : 'degraded', checks, fxCallsToday: await upstreamCallsToday() }, healthy ? 200 : 503)
 })
 
 // ── v1 ───────────────────────────────────────────────────────────────────────
+app.use('/v1/auth', authRouter)
+app.use('/v1/me', meRouter)
+app.use('/v1/goals', goalsRouter)
 app.use('/v1/reference', fxRouter)
 app.use('/v1/calculators', sipRouter)
+
+// Server-rendered admin. Mounted OUTSIDE /v1 because it is not part of the
+// public API contract and must never appear in the OpenAPI spec.
+app.use('/admin', adminRouter)
 
 app.use(notFound)
 app.use(errorHandler)
@@ -58,6 +70,8 @@ const server = app.listen(config.PORT, () => {
 })
 
 void connectRedis()
+void connectPrisma()
+void initSigningKeys()
 
 /**
  * Graceful shutdown. Node does not forward signals or reap children on its own,
@@ -72,7 +86,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     logger.info({ signal }, 'shutdown.begin')
 
     server.close(async () => {
-      await Promise.allSettled([redis.quit()])
+      await Promise.allSettled([redis.quit(), unsafeSystemClient.$disconnect()])
       logger.info('shutdown.complete')
       process.exit(0)
     })
