@@ -11,9 +11,14 @@ import { sipRouter } from './modules/calculators/sip.routes.js'
 import { upstreamCallsToday } from './modules/reference/fx.service.js'
 import { authRouter, meRouter } from './modules/auth/auth.routes.js'
 import { goalsRouter } from './modules/goals/goals.routes.js'
+import { syncRouter } from './modules/sync/sync.routes.js'
+import { assertRegistryMatchesEnum } from './modules/sync/registry.js'
 import { adminRouter } from './modules/admin/admin.routes.js'
 
 installBigIntSerialiser()
+// Fail at boot, not at the first delete, if the sync registry and the
+// sync_entity_type enum have drifted apart.
+assertRegistryMatchesEnum()
 
 const app = express()
 
@@ -51,6 +56,7 @@ app.get('/v1/health/ready', async (_req, res) => {
 app.use('/v1/auth', authRouter)
 app.use('/v1/me', meRouter)
 app.use('/v1/goals', goalsRouter)
+app.use('/v1/sync', syncRouter)
 app.use('/v1/reference', fxRouter)
 app.use('/v1/calculators', sipRouter)
 
