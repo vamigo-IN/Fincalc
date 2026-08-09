@@ -77,6 +77,15 @@ const schema = z.object({
    */
   BCRYPT_COST: z.coerce.number().int().min(8).max(15).default(11),
 
+  /**
+   * Rate-limit overrides. Production keeps the defaults in
+   * http/middleware/auth.ts; a dev or CI environment registering many throwaway
+   * accounts from one IP legitimately needs a higher auth bucket. Tunable via
+   * env so it never requires a code change or a deploy.
+   */
+  RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(10000).default(10),
+  RATE_LIMIT_WRITE_MAX: z.coerce.number().int().min(1).max(100000).default(120),
+
   MAX_DEVICES_PER_USER: z.coerce.number().int().default(5),
   FREE_TIER_GOAL_LIMIT: z.coerce.number().int().default(3),
 

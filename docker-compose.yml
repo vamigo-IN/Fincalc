@@ -125,6 +125,8 @@ services:
       JWT_CURRENT_KID: ${JWT_CURRENT_KID:-k1}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       BCRYPT_COST: ${BCRYPT_COST:-11}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
+      RATE_LIMIT_WRITE_MAX: ${RATE_LIMIT_WRITE_MAX:-120}
     ports:
       # Loopback only. The host's existing reverse proxy fronts this (docs 09 §2).
       - "127.0.0.1:8087:8087"

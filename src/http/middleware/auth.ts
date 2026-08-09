@@ -85,10 +85,10 @@ export type Bucket = 'auth' | 'refresh' | 'read' | 'write' | 'compute' | 'sync' 
 
 /** docs/fincalc-2.0/07 §1. Per user where we know them, per IP otherwise. */
 const LIMITS: Record<Bucket, { max: number; windowS: number }> = {
-  auth: { max: 10, windowS: 15 * 60 },
+  auth: { max: config.RATE_LIMIT_AUTH_MAX, windowS: 15 * 60 },
   refresh: { max: 60, windowS: 3600 },
   read: { max: 300, windowS: 60 },
-  write: { max: 120, windowS: 60 },
+  write: { max: config.RATE_LIMIT_WRITE_MAX, windowS: 60 },
   compute: { max: 60, windowS: 60 },
   sync: { max: 30, windowS: 60 },
   report: { max: 10, windowS: 3600 },
