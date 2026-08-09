@@ -1,0 +1,41 @@
+{
+  "name": "fincalc-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FinCalc 2.0 backend — Node 22 + Express 5 + TypeScript + Prisma + Redis",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/src/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:golden": "tsx --test test/golden/*.test.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
+    "infra:up": "docker compose up -d fincalc_postgres fincalc_redis",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0",
+    "express": "^5.0.1",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.4.2",
+    "pino": "^9.6.0",
+    "prisma": "^6.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "//prisma-note": "The prisma CLI is a RUNTIME dependency, not a dev one. fincalc_migrate runs `prisma migrate deploy` from this same image on the internal network, which has no internet. If the CLI is pruned with the dev deps, the container tries to download the schema engine at start and fails with EAI_AGAIN."
+}

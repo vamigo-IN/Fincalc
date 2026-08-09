@@ -1,0 +1,1412 @@
+// FinCalc 2.0 — Prisma 6 schema
+// GENERATED FROM docs/fincalc-2.0/06-prisma-schema.md sections 2-3. Do not edit by hand;
+// edit the document and re-extract, so the doc and the schema cannot drift.
+// Authority on columns/constraints: docs/fincalc-2.0/05-database-design.md
+// CHECK constraints, partial indexes, uuidv7(), next_sync_rev() and partitioning are NOT
+// expressible here — see 06 section 5 for the raw SQL migrations that carry them.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "relationJoins"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, citext, btree_gin]
+}
+
+enum UserStatus {
+  active
+  pending_deletion
+  suspended
+  deleted
+
+  @@map("user_status")
+}
+enum DevicePlatform {
+  android
+  ios
+  web
+
+  @@map("device_platform")
+}
+enum AuditActorType {
+  user
+  admin
+  system
+
+  @@map("audit_actor_type")
+}
+
+enum GoalType {
+  retirement
+  education
+  home
+  vehicle
+  travel
+  wedding
+  emergency
+  debt_payoff
+  wealth
+  custom
+
+  @@map("goal_type")
+}
+enum GoalStatus {
+  active
+  achieved
+  paused
+  archived
+
+  @@map("goal_status")
+}
+enum ContributionSource {
+  manual
+  sip_linked
+  bonus
+  windfall
+  rebalance
+
+  @@map("contribution_source")
+}
+
+enum TxnType {
+  expense
+  income
+  transfer
+
+  @@map("txn_type")
+}
+enum TxnSource {
+  manual
+  quick_add
+  recurring
+  bridge
+  import
+
+  @@map("txn_source")
+}
+enum CategoryKind {
+  essential
+  discretionary
+  savings
+  debt
+
+  @@map("category_kind")
+}
+
+enum AssetClass {
+  cash
+  bank_deposit
+  fd_rd
+  mutual_fund
+  equity
+  bonds_debt
+  ppf_epf_nps
+  gold
+  real_estate
+  insurance_cash_value
+  other
+
+  @@map("asset_class")
+}
+enum ValuationSource {
+  user
+  derived
+  imported
+
+  @@map("valuation_source")
+}
+enum LiabilityType {
+  home_loan
+  car_loan
+  personal_loan
+  education_loan
+  gold_loan
+  credit_card
+  consumer_durable
+  business_loan
+  informal
+  other
+
+  @@map("liability_type")
+}
+
+enum LoanType {
+  home
+  car
+  personal
+  education
+  gold
+  business
+  consumer_durable
+  credit_card_emi
+  other
+
+  @@map("loan_type")
+}
+enum LoanStatus {
+  active
+  closed
+  foreclosed
+  defaulted
+
+  @@map("loan_status")
+}
+enum LoanPaymentStatus {
+  scheduled
+  paid
+  part_paid
+  missed
+  prepayment
+
+  @@map("loan_payment_status")
+}
+
+enum IncomeStability {
+  salaried_stable
+  salaried_variable
+  self_employed
+  single_income
+
+  @@map("income_stability")
+}
+enum SnapshotPeriod {
+  month
+  quarter
+  fy
+
+  @@map("snapshot_period")
+}
+enum HealthBand {
+  needs_attention
+  fair
+  good
+  strong
+
+  @@map("health_band")
+}
+
+enum RuleStatus {
+  draft
+  active
+  paused
+  retired
+
+  @@map("rule_status")
+}
+enum RecommendationSeverity {
+  info
+  suggested
+  important
+
+  @@map("recommendation_severity")
+}
+enum RecommendationStatus {
+  active
+  dismissed
+  snoozed
+  actioned
+  expired
+
+  @@map("recommendation_status")
+}
+enum RecommendationEventType {
+  shown
+  opened
+  actioned
+  dismissed
+  snoozed
+
+  @@map("recommendation_event_type")
+}
+
+enum CreditRatingBand {
+  needs_attention
+  fair
+  good
+  strong
+  excellent
+
+  @@map("credit_rating_band")
+}
+
+enum CalendarEventType {
+  emi_due
+  sip_due
+  goal_contribution
+  bill_due
+  insurance_premium
+  tax_due
+  gst_due
+  fd_maturity
+  rd_maturity
+  budget_close
+  custom
+
+  @@map("calendar_event_type")
+}
+enum CalendarEventStatus {
+  scheduled
+  notified
+  paid
+  skipped
+  missed
+
+  @@map("calendar_event_status")
+}
+enum RecurrenceFreq {
+  once
+  daily
+  weekly
+  monthly
+  quarterly
+  half_yearly
+  yearly
+
+  @@map("recurrence_freq")
+}
+enum NotificationChannel {
+  push
+  local
+  email
+  in_app
+
+  @@map("notification_channel")
+}
+enum NotificationStatus {
+  queued
+  sent
+  delivered
+  failed
+  suppressed
+  read
+
+  @@map("notification_status")
+}
+
+enum ArticleStatus {
+  draft
+  published
+  archived
+
+  @@map("article_status")
+}
+enum LearningStatus {
+  unread
+  in_progress
+  completed
+
+  @@map("learning_status")
+}
+
+enum ReportType {
+  emi
+  tax
+  gst
+  fd_rd
+  ppf_nps
+  investment
+  net_worth
+  budget
+  goals
+  monthly_summary
+  annual_summary
+  loan_portfolio
+
+  @@map("report_type")
+}
+enum ReportStatus {
+  queued
+  generating
+  ready
+  failed
+  expired
+
+  @@map("report_status")
+}
+enum ArtifactKind {
+  pdf
+  csv
+  json
+
+  @@map("artifact_kind")
+}
+
+enum SubscriptionPlatform {
+  google_play
+  manual
+
+  @@map("subscription_platform")
+}
+enum SubscriptionStatus {
+  pending_verification
+  active
+  grace
+  on_hold
+  paused
+  cancelled
+  expired
+
+  @@map("subscription_status")
+}
+enum EntitlementSource {
+  subscription
+  promo
+  grant
+  trial
+
+  @@map("entitlement_source")
+}
+
+enum RateKind {
+  fx
+  repo
+  inflation_cpi
+  epf
+  ppf
+  nps_tier1
+
+  @@map("rate_kind")
+}
+enum RulesetStatus {
+  draft
+  active
+  superseded
+
+  @@map("ruleset_status")
+}
+
+enum SyncEntityType {
+  user_profiles
+  expense_categories
+  budgets
+  budget_categories
+  transactions
+  goals
+  goal_contributions
+  loans
+  loan_payments
+  emergency_funds
+  retirement_plans
+  calendar_events
+  saved_calculations
+  credit_health_inputs
+  assets
+  asset_valuations
+  liabilities
+  learning_progress
+  recommendation_events
+
+  @@map("sync_entity_type")
+}
+
+model User {
+  id                  String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  email               String    @db.Citext
+  emailVerifiedAt     DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  passwordHash        String    @map("password_hash")
+  passwordChangedAt   DateTime  @default(now()) @map("password_changed_at") @db.Timestamptz(6)
+  status              UserStatus @default(active)
+  failedLoginCount    Int       @default(0) @map("failed_login_count") @db.SmallInt
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz(6)
+  deletionRequestedAt DateTime? @map("deletion_requested_at") @db.Timestamptz(6)
+  /// Reserved. The erasure that ships (05 §9.3) hard-deletes the row, so this is never set. See 05 R2.
+  anonymisedAt        DateTime? @map("anonymised_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  profile        UserProfile?
+  devices        UserDevice[]
+  refreshTokens  RefreshToken[]
+  goals          Goal[]
+  goalContributions GoalContribution[]
+  expenseCategories ExpenseCategory[]
+  budgets        Budget[]
+  budgetCategories BudgetCategory[]
+  transactions   Transaction[]
+  assets         Asset[]
+  assetValuations AssetValuation[]
+  liabilities    Liability[]
+  loans          Loan[]
+  loanPayments   LoanPayment[]
+  emergencyFunds EmergencyFund[]
+  retirementPlans RetirementPlan[]
+  netWorthSnapshots NetWorthSnapshot[]
+  financialSnapshots FinancialSnapshot[]
+  healthScores   HealthScore[]
+  recommendations AdvisorRecommendation[]
+  recommendationEvents RecommendationEvent[]
+  creditHealthInputs CreditHealthInput[]
+  creditHealthAssessments CreditHealthAssessment[]
+  calendarEvents CalendarEvent[]
+  notifications  Notification[]
+  notificationTokens NotificationToken[]
+  learningProgress LearningProgress[]
+  savedCalculations SavedCalculation[]
+  reports        Report[]
+  reportArtifacts ReportArtifact[]
+  subscriptions  Subscription[]
+  entitlements   Entitlement[]
+  syncState      SyncState?
+  syncTombstones SyncTombstone[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id                    String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId                String    @unique @map("user_id") @db.Uuid
+  displayName           String?   @map("display_name")
+  dateOfBirth           DateTime? @map("date_of_birth") @db.Date
+  city                  String?
+  stateCode             String?   @map("state_code") @db.Char(2)
+  isMetroForHra         Boolean   @default(false) @map("is_metro_for_hra")
+  occupation            String?
+  dependants            Int       @default(0) @db.SmallInt
+  maritalStatus         String?   @map("marital_status")
+  locale                String    @default("en_IN")
+  timezone              String    @default("Asia/Kolkata")
+  currencyCode          String    @default("INR") @map("currency_code") @db.Char(3)
+  notificationPrefs     Json      @default("{\"emi\":true,\"goals\":true,\"budget\":true,\"tax\":true,\"advisor\":true,\"learn\":false}") @map("notification_prefs")
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev               BigInt    @default(0) @map("sync_rev")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, syncRev], map: "ix_user_profiles__sync")
+  @@map("user_profiles")
+}
+
+model UserDevice {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  deviceId    String    @map("device_id") @db.Uuid
+  platform    DevicePlatform
+  model       String?
+  osVersion   String?   @map("os_version")
+  appVersion  String?   @map("app_version")
+  pushEnabled Boolean   @default(false) @map("push_enabled")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+  pushTokens    NotificationToken[]
+
+  @@unique([userId, deviceId], map: "ux_user_devices__user_device")
+  @@map("user_devices")
+}
+
+model RefreshToken {
+  id            String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  deviceId      String?   @map("device_id") @db.Uuid
+  tokenHash     Bytes     @unique(map: "ux_refresh_tokens__hash") @map("token_hash")
+  familyId      String    @map("family_id") @db.Uuid
+  parentId      String?   @map("parent_id") @db.Uuid
+  issuedAt      DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt        DateTime? @map("used_at") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason String?   @map("revoked_reason")
+  ipPrefix      String?   @map("ip_prefix") @db.Inet
+  userAgent     String?   @map("user_agent")
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device UserDevice?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  parent RefreshToken? @relation("TokenLineage", fields: [parentId], references: [id], onDelete: SetNull)
+  children RefreshToken[] @relation("TokenLineage")
+
+  @@index([familyId], map: "ix_refresh_tokens__family")
+  @@index([expiresAt], map: "ix_refresh_tokens__cleanup")
+  @@map("refresh_tokens")
+}
+
+model AuthAuditLog {
+  id             String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  subjectHash    Bytes?   @map("subject_hash")
+  emailAttempted String?  @map("email_attempted") @db.Citext
+  event          String
+  outcome        String
+  deviceId       String?  @map("device_id") @db.Uuid
+  ipPrefix       String?  @map("ip_prefix") @db.Inet
+  userAgent      String?  @map("user_agent")
+  detail         Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)], map: "ix_auth_audit_log__user_time")
+  @@index([event, createdAt(sort: Desc)], map: "ix_auth_audit_log__event_time")
+  @@map("auth_audit_log")
+}
+
+model SyncState {
+  userId          String    @id @map("user_id") @db.Uuid
+  revCounter      BigInt    @default(0) @map("rev_counter")
+  minRetainedRev  BigInt    @default(0) @map("min_retained_rev")
+  lastPullAt      DateTime? @map("last_pull_at") @db.Timestamptz(6)
+  lastPushAt      DateTime? @map("last_push_at") @db.Timestamptz(6)
+  lastBootstrapAt DateTime? @map("last_bootstrap_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sync_state")
+}
+
+model SyncTombstone {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  entityTable SyncEntityType @map("entity_table")
+  entityId    String    @map("entity_id") @db.Uuid
+  syncRev     BigInt    @map("sync_rev")
+  deletedAt   DateTime  @map("deleted_at") @db.Timestamptz(6)
+  purgedAt    DateTime? @map("purged_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityTable, entityId], map: "ux_sync_tombstones__entity")
+  @@index([userId, syncRev], map: "ix_sync_tombstones__pull")
+  @@map("sync_tombstones")
+}
+
+model Goal {
+  id                       String    @id @db.Uuid          // client-supplied UUIDv7 — no @default
+  userId                   String    @map("user_id") @db.Uuid
+  name                     String
+  goalType                 GoalType  @default(custom) @map("goal_type")
+  targetAmountPaise        BigInt    @map("target_amount_paise")
+  currentAmountPaise       BigInt    @default(0) @map("current_amount_paise")
+  startDate                DateTime  @map("start_date") @db.Date
+  targetDate               DateTime  @map("target_date") @db.Date
+  priority                 Int       @default(100) @db.SmallInt
+  expectedReturnRateMicro  Int       @default(120000) @map("expected_return_rate_micro")
+  monthlyContributionPaise BigInt    @default(0) @map("monthly_contribution_paise")
+  status                   GoalStatus @default(active)
+  sourceCalculationId      String?   @map("source_calculation_id") @db.Uuid
+  notes                    String?
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt                DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev                  BigInt    @default(0) @map("sync_rev")
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceCalculation SavedCalculation?  @relation(fields: [sourceCalculationId], references: [id], onDelete: SetNull)
+  contributions     GoalContribution[]
+  linkedAssets      Asset[]
+  emergencyFunds    EmergencyFund[]
+  calendarEvents    CalendarEvent[]
+
+  @@index([userId, priority, id], map: "ix_goals__user_live")
+  @@index([userId, status], map: "ix_goals__user_status")
+  @@index([userId, syncRev], map: "ix_goals__user_sync")
+  @@index([userId, targetDate], map: "ix_goals__target_date")
+  @@map("goals")
+}
+
+model GoalContribution {
+  id            String    @id @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  goalId        String    @map("goal_id") @db.Uuid
+  amountPaise   BigInt    @map("amount_paise")
+  contributedOn DateTime  @map("contributed_on") @db.Date
+  source        ContributionSource @default(manual)
+  note          String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev       BigInt    @default(0) @map("sync_rev")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, contributedOn(sort: Desc)], map: "ix_goal_contributions__goal_date")
+  @@index([userId, syncRev], map: "ix_goal_contributions__user_sync")
+  @@map("goal_contributions")
+}
+
+model ExpenseCategory {
+  id           String    @id @db.Uuid
+  userId       String?   @map("user_id") @db.Uuid   // NULL = system seed (05 L4 exception)
+  categoryKey  String    @map("category_key")
+  name         String
+  kind         CategoryKind @default(discretionary)
+  iconKey      String    @default("category") @map("icon_key")
+  colorHex     String    @default("#607D8B") @map("color_hex") @db.Char(7)
+  sortOrder    Int       @default(500) @map("sort_order") @db.SmallInt
+  parentId     String?   @map("parent_id") @db.Uuid
+  /// GENERATED ALWAYS AS (user_id IS NULL) STORED — see §9.4. Prisma cannot declare it; the column
+  /// is created in raw SQL and is read-only here.
+  isSystem     Boolean   @map("is_system")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev      BigInt    @default(0) @map("sync_rev")
+
+  user     User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   ExpenseCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children ExpenseCategory[] @relation("CategoryTree")
+  budgetCategories BudgetCategory[]
+  transactions     Transaction[]
+
+  @@index([userId, sortOrder], map: "ix_expense_categories__user_sort")
+  @@index([userId, syncRev], map: "ix_expense_categories__user_sync")
+  @@map("expense_categories")
+}
+
+model Budget {
+  id                  String    @id @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  periodMonth         DateTime  @map("period_month") @db.Date
+  incomePaise         BigInt    @default(0) @map("income_paise")
+  plannedSavingsPaise BigInt    @default(0) @map("planned_savings_paise")
+  note                String?
+  closedAt            DateTime? @map("closed_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev             BigInt    @default(0) @map("sync_rev")
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories BudgetCategory[]
+  transactions Transaction[]
+
+  @@index([userId, syncRev], map: "ix_budgets__user_sync")
+  @@map("budgets")
+}
+
+model BudgetCategory {
+  id              String    @id @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  budgetId        String    @map("budget_id") @db.Uuid
+  categoryId      String    @map("category_id") @db.Uuid
+  allocatedPaise  BigInt    @default(0) @map("allocated_paise")
+  rolloverEnabled Boolean   @default(false) @map("rollover_enabled")
+  sortOrder       Int       @default(500) @map("sort_order") @db.SmallInt
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev         BigInt    @default(0) @map("sync_rev")
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budget   Budget          @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([userId, syncRev], map: "ix_budget_categories__user_sync")
+  @@map("budget_categories")
+}
+
+model Transaction {
+  id          String    @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  budgetId    String?   @map("budget_id") @db.Uuid
+  categoryId  String    @map("category_id") @db.Uuid
+  amountPaise BigInt    @map("amount_paise")
+  txnType     TxnType   @default(expense) @map("txn_type")
+  source      TxnSource @default(manual)
+  note        String    @default("")
+  occurredOn  DateTime  @map("occurred_on") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev     BigInt    @default(0) @map("sync_rev")
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budget   Budget?         @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([occurredOn, id], map: "pk_transactions")
+  @@unique([id], map: "ux_transactions__id")
+  @@index([userId, occurredOn(sort: Desc)], map: "ix_transactions__user_month")
+  @@index([userId, categoryId, occurredOn], map: "ix_transactions__user_cat_month")
+  @@index([userId, syncRev], map: "ix_transactions__user_sync")
+  @@index([budgetId], map: "ix_transactions__budget")
+  @@map("transactions")
+}
+
+model Asset {
+  id                String    @id @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  name              String
+  assetClass        AssetClass @map("asset_class")
+  currentValuePaise BigInt    @default(0) @map("current_value_paise")
+  asOfDate          DateTime  @default(now()) @map("as_of_date") @db.Date
+  isLiquid          Boolean   @default(false) @map("is_liquid")
+  institution       String?
+  linkedGoalId      String?   @map("linked_goal_id") @db.Uuid
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev           BigInt    @default(0) @map("sync_rev")
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedGoal Goal?            @relation(fields: [linkedGoalId], references: [id], onDelete: SetNull)
+  valuations AssetValuation[]
+
+  @@index([userId, assetClass], map: "ix_assets__user_live")
+  @@index([userId, syncRev], map: "ix_assets__user_sync")
+  @@map("assets")
+}
+
+model AssetValuation {
+  id         String    @id @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  assetId    String    @map("asset_id") @db.Uuid
+  valuePaise BigInt    @map("value_paise")
+  valuedOn   DateTime  @map("valued_on") @db.Date
+  source     ValuationSource @default(user)
+  note       String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev    BigInt    @default(0) @map("sync_rev")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([userId, syncRev], map: "ix_asset_valuations__user_sync")
+  @@map("asset_valuations")
+}
+
+model Liability {
+  id                String    @id @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  name              String
+  liabilityType     LiabilityType @map("liability_type")
+  outstandingPaise  BigInt    @default(0) @map("outstanding_paise")
+  interestRateMicro Int       @default(0) @map("interest_rate_micro")
+  asOfDate          DateTime  @default(now()) @map("as_of_date") @db.Date
+  sourceLoanId      String?   @map("source_loan_id") @db.Uuid
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev           BigInt    @default(0) @map("sync_rev")
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceLoan Loan? @relation(fields: [sourceLoanId], references: [id], onDelete: Cascade)
+
+  @@index([userId, liabilityType], map: "ix_liabilities__user_live")
+  @@index([userId, syncRev], map: "ix_liabilities__user_sync")
+  @@map("liabilities")
+}
+
+model Loan {
+  id                   String    @id @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  loanType             LoanType  @map("loan_type")
+  lenderName           String    @default("") @map("lender_name")
+  principalPaise       BigInt    @map("principal_paise")
+  interestRateMicro    Int       @map("interest_rate_micro")
+  tenureMonths         Int       @map("tenure_months") @db.SmallInt
+  startDate            DateTime  @map("start_date") @db.Date
+  emiDay               Int       @default(5) @map("emi_day") @db.SmallInt
+  emiPaise             BigInt    @map("emi_paise")
+  outstandingPaise     BigInt    @map("outstanding_paise")
+  prepaymentTotalPaise BigInt    @default(0) @map("prepayment_total_paise")
+  status               LoanStatus @default(active)
+  sourceCalculationId  String?   @map("source_calculation_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev              BigInt    @default(0) @map("sync_rev")
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceCalculation SavedCalculation? @relation(fields: [sourceCalculationId], references: [id], onDelete: SetNull)
+  payments          LoanPayment[]
+  liabilities       Liability[]
+  calendarEvents    CalendarEvent[]
+
+  @@index([userId, status], map: "ix_loans__user_live")
+  @@index([userId, syncRev], map: "ix_loans__user_sync")
+  @@map("loans")
+}
+
+model LoanPayment {
+  id             String    @id @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  loanId         String    @map("loan_id") @db.Uuid
+  instalmentNo   Int?      @map("instalment_no") @db.SmallInt
+  dueDate        DateTime  @map("due_date") @db.Date
+  paidOn         DateTime? @map("paid_on") @db.Date
+  amountPaise    BigInt    @map("amount_paise")
+  principalPaise BigInt    @default(0) @map("principal_paise")
+  interestPaise  BigInt    @default(0) @map("interest_paise")
+  status         LoanPaymentStatus @default(scheduled)
+  isPrepayment   Boolean   @default(false) @map("is_prepayment")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev        BigInt    @default(0) @map("sync_rev")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loan Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([loanId, dueDate], map: "ix_loan_payments__loan_due")
+  @@index([userId, syncRev], map: "ix_loan_payments__user_sync")
+  @@index([userId, dueDate], map: "ix_loan_payments__overdue")
+  @@map("loan_payments")
+}
+
+model EmergencyFund {
+  id                     String    @id @db.Uuid
+  userId                 String    @map("user_id") @db.Uuid
+  monthlyEssentialPaise  BigInt    @default(0) @map("monthly_essential_paise")
+  dependants             Int       @default(0) @db.SmallInt
+  incomeStability        IncomeStability @default(salaried_stable) @map("income_stability")
+  targetMonths           Int       @default(6) @map("target_months") @db.SmallInt
+  currentCorpusPaise     BigInt    @default(0) @map("current_corpus_paise")
+  monthlyFundingPaise    BigInt    @default(0) @map("monthly_funding_paise")
+  linkedGoalId           String?   @map("linked_goal_id") @db.Uuid
+  essentialsAutoDerived  Boolean   @default(true) @map("essentials_auto_derived")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev                BigInt    @default(0) @map("sync_rev")
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedGoal Goal? @relation(fields: [linkedGoalId], references: [id], onDelete: SetNull)
+
+  @@index([userId, syncRev], map: "ix_emergency_funds__user_sync")
+  @@map("emergency_funds")
+}
+
+model RetirementPlan {
+  id                        String    @id @db.Uuid
+  userId                    String    @map("user_id") @db.Uuid
+  name                      String    @default("My retirement")
+  currentAge                Int       @map("current_age") @db.SmallInt
+  retirementAge             Int       @map("retirement_age") @db.SmallInt
+  lifeExpectancy            Int       @default(85) @map("life_expectancy") @db.SmallInt
+  currentCorpusPaise        BigInt    @default(0) @map("current_corpus_paise")
+  monthlyContributionPaise  BigInt    @default(0) @map("monthly_contribution_paise")
+  preReturnRateMicro        Int       @default(120000) @map("pre_return_rate_micro")
+  postReturnRateMicro       Int       @default(70000) @map("post_return_rate_micro")
+  inflationRateMicro        Int       @default(60000) @map("inflation_rate_micro")
+  desiredMonthlyIncomePaise BigInt    @default(0) @map("desired_monthly_income_paise")
+  epfBalancePaise           BigInt    @default(0) @map("epf_balance_paise")
+  npsBalancePaise           BigInt    @default(0) @map("nps_balance_paise")
+  isPrimary                 Boolean   @default(true) @map("is_primary")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt                 DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev                   BigInt    @default(0) @map("sync_rev")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, syncRev], map: "ix_retirement_plans__user_sync")
+  @@map("retirement_plans")
+}
+
+model NetWorthSnapshot {
+  id               String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  snapshotDate     DateTime @map("snapshot_date") @db.Date
+  assetsPaise      BigInt   @map("assets_paise")
+  liabilitiesPaise BigInt   @map("liabilities_paise")
+  netWorthPaise    BigInt   @map("net_worth_paise")
+  liquidPaise      BigInt   @default(0) @map("liquid_paise")
+  composition      Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, snapshotDate], map: "ux_nws__user_date")
+  @@map("net_worth_snapshots")
+}
+
+model FinancialSnapshot {
+  id                  String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId              String   @map("user_id") @db.Uuid
+  period              SnapshotPeriod @default(month)
+  periodStart         DateTime @map("period_start") @db.Date
+  periodEnd           DateTime @map("period_end") @db.Date
+  incomePaise         BigInt   @default(0) @map("income_paise")
+  expensePaise        BigInt   @default(0) @map("expense_paise")
+  essentialPaise      BigInt   @default(0) @map("essential_paise")
+  discretionaryPaise  BigInt   @default(0) @map("discretionary_paise")
+  savingsPaise        BigInt   @default(0) @map("savings_paise")
+  emiOutflowPaise     BigInt   @default(0) @map("emi_outflow_paise")
+  investmentPaise     BigInt   @default(0) @map("investment_paise")
+  categoryBreakdown   Json     @default("{}") @map("category_breakdown")
+  txnCount            Int      @default(0) @map("txn_count")
+  dataCompletenessPct Int      @default(0) @map("data_completeness_pct") @db.SmallInt
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthScores HealthScore[]
+
+  @@unique([userId, period, periodStart], map: "ux_fs__user_period")
+  @@index([userId, period, periodStart(sort: Desc)], map: "ix_fs__user_recent")
+  @@map("financial_snapshots")
+}
+
+model HealthScore {
+  id             String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  scoredOn       DateTime @map("scored_on") @db.Date
+  score          Int      @db.SmallInt
+  band           HealthBand
+  rawScore       Int      @map("raw_score") @db.SmallInt
+  coveragePct    Int      @map("coverage_pct") @db.SmallInt
+  components     Json
+  factSnapshotId String?  @map("fact_snapshot_id") @db.Uuid
+  rulesetVersion String   @map("ruleset_version")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  factSnapshot FinancialSnapshot? @relation(fields: [factSnapshotId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, scoredOn], map: "ux_hs__user_date")
+  @@map("health_scores")
+}
+
+model AdvisorRule {
+  id             String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  ruleKey        String   @unique(map: "ux_advisor_rules__key") @map("rule_key")
+  moduleKey      String   @map("module_key")
+  titleTemplate  String   @map("title_template")
+  bodyTemplate   String   @map("body_template")
+  severity       RecommendationSeverity @default(suggested)
+  status         RuleStatus @default(draft)
+  priority       Int      @default(100) @db.SmallInt
+  impactWeight   Int      @default(50) @map("impact_weight") @db.SmallInt
+  actionability  Int      @default(50) @db.SmallInt
+  exclusionGroup String?  @map("exclusion_group")
+  cooldownDays   Int      @default(30) @map("cooldown_days") @db.SmallInt
+  requiredFacts  String[] @map("required_facts")
+  condition      Json
+  cta            Json     @default("{}")
+  currentVersion Int      @default(1) @map("current_version")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  versions        AdvisorRuleVersion[]
+  recommendations AdvisorRecommendation[]
+
+  @@index([moduleKey, priority], map: "ix_advisor_rules__active")
+  @@map("advisor_rules")
+}
+
+model AdvisorRuleVersion {
+  id            String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  ruleId        String   @map("rule_id") @db.Uuid
+  version       Int
+  condition     Json
+  titleTemplate String   @map("title_template")
+  bodyTemplate  String   @map("body_template")
+  severity      RecommendationSeverity
+  changedBy     String   @map("changed_by")
+  changeNote    String?  @map("change_note")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  rule AdvisorRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, version], map: "ux_arv__rule_version")
+  @@map("advisor_rule_versions")
+}
+
+model AdvisorRecommendation {
+  id           String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  ruleId       String    @map("rule_id") @db.Uuid
+  ruleVersion  Int       @map("rule_version")
+  severity     RecommendationSeverity
+  status       RecommendationStatus @default(active)
+  rankScore    Decimal   @default(0) @map("rank_score") @db.Decimal(9, 4)
+  title        String
+  body         String
+  citedFacts   Json      @default("{}") @map("cited_facts")
+  cta          Json      @default("{}")
+  generatedAt  DateTime  @default(now()) @map("generated_at") @db.Timestamptz(6)
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz(6)
+  dismissedAt  DateTime? @map("dismissed_at") @db.Timestamptz(6)
+  snoozedUntil DateTime? @map("snoozed_until") @db.Timestamptz(6)
+  actionedAt   DateTime? @map("actioned_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule   AdvisorRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  events RecommendationEvent[]
+
+  @@index([userId, ruleId, generatedAt(sort: Desc)], map: "ix_ar__cooldown")
+  @@map("advisor_recommendations")
+}
+
+model RecommendationEvent {
+  id               String   @id @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  recommendationId String   @map("recommendation_id") @db.Uuid
+  eventType        RecommendationEventType @map("event_type")
+  occurredAt       DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  detail           Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev          BigInt   @default(0) @map("sync_rev")
+
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommendation AdvisorRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+
+  @@index([recommendationId, eventType], map: "ix_re__rec_type")
+  @@index([userId, syncRev], map: "ix_re__user_sync")
+  @@index([eventType, occurredAt(sort: Desc)], map: "ix_re__type_time")
+  @@map("recommendation_events")
+}
+
+model CreditHealthInput {
+  id                    String    @id @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  activeLoanCount       Int       @default(0) @map("active_loan_count") @db.SmallInt
+  creditCardCount       Int       @default(0) @map("credit_card_count") @db.SmallInt
+  totalCardLimitPaise   BigInt    @default(0) @map("total_card_limit_paise")
+  totalCardBalancePaise BigInt    @default(0) @map("total_card_balance_paise")
+  missedPayments12m     Int       @default(0) @map("missed_payments_12m") @db.SmallInt
+  oldestAccountMonths   Int       @default(0) @map("oldest_account_months") @db.SmallInt
+  recentEnquiries6m     Int       @default(0) @map("recent_enquiries_6m") @db.SmallInt
+  hasSecuredLoan        Boolean   @default(false) @map("has_secured_loan")
+  selfReportedAt        DateTime  @default(now()) @map("self_reported_at") @db.Date
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev               BigInt    @default(0) @map("sync_rev")
+
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessments CreditHealthAssessment[]
+
+  @@index([userId, syncRev], map: "ix_chi__user_sync")
+  @@map("credit_health_inputs")
+}
+
+model CreditHealthAssessment {
+  id            String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  inputId       String?  @map("input_id") @db.Uuid
+  band          CreditRatingBand
+  factors       Json     @default("[]")
+  riskFlags     String[] @map("risk_flags")
+  suggestions   Json     @default("[]")
+  rubricVersion String   @map("rubric_version")
+  assessedAt    DateTime @default(now()) @map("assessed_at") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  input CreditHealthInput? @relation(fields: [inputId], references: [id], onDelete: SetNull)
+
+  @@index([userId, assessedAt(sort: Desc)], map: "ix_cha__user_time")
+  @@map("credit_health_assessments")
+}
+
+model CalendarEvent {
+  id               String    @id @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  eventType        CalendarEventType @map("event_type")
+  title            String
+  amountPaise      BigInt?   @map("amount_paise")
+  dueOn            DateTime  @map("due_on") @db.Date
+  recurrence       RecurrenceFreq @default(once)
+  recurrenceUntil  DateTime? @map("recurrence_until") @db.Date
+  status           CalendarEventStatus @default(scheduled)
+  remindDaysBefore Int       @default(1) @map("remind_days_before") @db.SmallInt
+  sourceLoanId     String?   @map("source_loan_id") @db.Uuid
+  sourceGoalId     String?   @map("source_goal_id") @db.Uuid
+  isAuto           Boolean   @default(false) @map("is_auto")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev          BigInt    @default(0) @map("sync_rev")
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceLoan Loan? @relation(fields: [sourceLoanId], references: [id], onDelete: Cascade)
+  sourceGoal Goal? @relation(fields: [sourceGoalId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dueOn], map: "ix_ce__user_due")
+  @@index([userId, syncRev], map: "ix_ce__user_sync")
+  @@index([sourceLoanId, dueOn], map: "ix_ce__auto_source")
+  @@map("calendar_events")
+}
+
+model NotificationToken {
+  id           String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  deviceId     String?   @map("device_id") @db.Uuid
+  fcmToken     String    @unique(map: "ux_nt__token") @map("fcm_token")
+  platform     DevicePlatform
+  isActive     Boolean   @default(true) @map("is_active")
+  lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz(6)
+  failureCount Int       @default(0) @map("failure_count") @db.SmallInt
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device UserDevice? @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("notification_tokens")
+}
+
+model Notification {
+  id            String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  channel       NotificationChannel @default(push)
+  status        NotificationStatus  @default(queued)
+  templateKey   String    @map("template_key")
+  title         String
+  body          String
+  payload       Json      @default("{}")
+  dedupeKey     String?   @map("dedupe_key")
+  scheduledFor  DateTime  @default(now()) @map("scheduled_for") @db.Timestamptz(6)
+  sentAt        DateTime? @map("sent_at") @db.Timestamptz(6)
+  readAt        DateTime? @map("read_at") @db.Timestamptz(6)
+  failureReason String?   @map("failure_reason")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledFor], map: "ix_notif__due")
+  @@index([userId, createdAt(sort: Desc)], map: "ix_notif__user_feed")
+  @@map("notifications")
+}
+
+model LearningCategory {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  categoryKey String   @unique(map: "ux_lc__key") @map("category_key")
+  name        String
+  description String?
+  iconKey     String   @default("school") @map("icon_key")
+  sortOrder   Int      @default(500) @map("sort_order") @db.SmallInt
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  articles LearningArticle[]
+
+  @@map("learning_categories")
+}
+
+model LearningArticle {
+  id               String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  categoryId       String    @map("category_id") @db.Uuid
+  slug             String
+  title            String
+  summary          String    @default("")
+  bodyMarkdown     String    @map("body_markdown")
+  readMinutes      Int       @default(3) @map("read_minutes") @db.SmallInt
+  status           ArticleStatus @default(draft)
+  locale           String    @default("en_IN")
+  contentVersion   Int       @default(1) @map("content_version")
+  relatedModuleKey String?   @map("related_module_key")
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category LearningCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  progress LearningProgress[]
+
+  @@unique([slug, locale], map: "ux_la__slug_locale")
+  @@map("learning_articles")
+}
+
+model LearningProgress {
+  id          String    @id @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  articleId   String    @map("article_id") @db.Uuid
+  status      LearningStatus @default(unread)
+  progressPct Int       @default(0) @map("progress_pct") @db.SmallInt
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev     BigInt    @default(0) @map("sync_rev")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article LearningArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([userId, syncRev], map: "ix_lp__user_sync")
+  @@map("learning_progress")
+}
+
+model SavedCalculation {
+  id             String    @id @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  calculatorKey  String    @map("calculator_key")
+  label          String?
+  inputs         Json
+  outputs        Json
+  engineVersion  String    @map("engine_version")
+  rulesetVersion String?   @map("ruleset_version")
+  isPinned       Boolean   @default(false) @map("is_pinned")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  syncRev        BigInt    @default(0) @map("sync_rev")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goals Goal[]
+  loans Loan[]
+
+  @@index([userId, createdAt(sort: Desc)], map: "ix_sc__user_recent")
+  @@index([userId, calculatorKey, createdAt(sort: Desc)], map: "ix_sc__user_kind")
+  @@index([userId, syncRev], map: "ix_sc__user_sync")
+  @@map("saved_calculations")
+}
+
+model Report {
+  id            String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  reportType    ReportType @map("report_type")
+  status        ReportStatus @default(queued)
+  periodStart   DateTime? @map("period_start") @db.Date
+  periodEnd     DateTime? @map("period_end") @db.Date
+  params        Json      @default("{}")
+  payload       Json?
+  requestedAt   DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz(6)
+  failureReason String?   @map("failure_reason")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts ReportArtifact[]
+
+  @@index([userId, requestedAt(sort: Desc)], map: "ix_reports__user_recent")
+  @@index([status, requestedAt], map: "ix_reports__queue")
+  @@map("reports")
+}
+
+model ReportArtifact {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  reportId    String   @map("report_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  kind        ArtifactKind @default(pdf)
+  storagePath String   @map("storage_path")
+  byteSize    Int      @map("byte_size")
+  sha256      Bytes
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([reportId], map: "ix_ra__report")
+  @@map("report_artifacts")
+}
+
+model Subscription {
+  id                 String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  platform           SubscriptionPlatform @default(google_play)
+  productId          String    @map("product_id")
+  purchaseToken      String?   @unique(map: "ux_subs__purchase_token") @map("purchase_token")
+  orderId            String?   @map("order_id")
+  status             SubscriptionStatus @default(pending_verification)
+  currentPeriodStart DateTime? @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd   DateTime? @map("current_period_end") @db.Timestamptz(6)
+  autoRenewing       Boolean   @default(true) @map("auto_renewing")
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  lastVerifiedAt     DateTime? @map("last_verified_at") @db.Timestamptz(6)
+  rawNotification    Json      @default("{}") @map("raw_notification")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entitlements Entitlement[]
+
+  @@index([userId, status], map: "ix_subs__user_status")
+  @@index([currentPeriodEnd], map: "ix_subs__expiring")
+  @@map("subscriptions")
+}
+
+model Entitlement {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  featureKey     String    @map("feature_key")
+  source         EntitlementSource @default(subscription)
+  subscriptionId String?   @map("subscription_id") @db.Uuid
+  grantedAt      DateTime  @default(now()) @map("granted_at") @db.Timestamptz(6)
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@map("entitlements")
+}
+
+model FeatureFlag {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  flagKey     String   @unique(map: "ux_ff__key") @map("flag_key")
+  description String   @default("")
+  isEnabled   Boolean  @default(false) @map("is_enabled")
+  rolloutPct  Int      @default(0) @map("rollout_pct") @db.SmallInt
+  targetRule  Json     @default("{}") @map("target_rule")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("feature_flags")
+}
+
+model TaxRuleset {
+  id            String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  fyLabel       String    @map("fy_label")
+  rulesetKey    String    @unique(map: "ux_tr__key") @map("ruleset_key")
+  status        RulesetStatus @default(draft)
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  schemaVersion Int       @default(1) @map("schema_version")
+  ruleset       Json
+  checksum      Bytes
+  sourceNote    String    @default("") @map("source_note")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("tax_rulesets")
+}
+
+model ReferenceRate {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  rateKind  RateKind @map("rate_kind")
+  code      String
+  rate      Decimal  @db.Decimal(9, 6)
+  asOf      DateTime @map("as_of") @db.Date
+  source    String   @default("")
+  fetchedAt DateTime @default(now()) @map("fetched_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([rateKind, code, asOf], map: "ux_rr__kind_code_date")
+  @@index([rateKind, code, asOf(sort: Desc)], map: "ix_rr__latest")
+  @@map("reference_rates")
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  actorType   AuditActorType @default(user) @map("actor_type")
+  actorId     String?  @map("actor_id") @db.Uuid
+  subjectHash Bytes?   @map("subject_hash")
+  action      String
+  entityTable String?  @map("entity_table")
+  entityId    String?  @map("entity_id") @db.Uuid
+  before      Json?
+  after       Json?
+  requestId   String?  @map("request_id")
+  ipPrefix    String?  @map("ip_prefix") @db.Inet
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([subjectHash, createdAt(sort: Desc)], map: "ix_audit__subject_time")
+  @@index([entityTable, entityId, createdAt(sort: Desc)], map: "ix_audit__entity")
+  @@index([action, createdAt(sort: Desc)], map: "ix_audit__action_time")
+  @@map("audit_log")
+}
