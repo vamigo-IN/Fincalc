@@ -13,6 +13,7 @@ import { uuidv7 } from 'uuidv7'
 
 import { unsafeSystemClient as db } from '../src/db/prisma.js'
 import { pull, push } from '../src/modules/sync/sync.service.js'
+import { implementedTables } from '../src/modules/sync/registry.js'
 import { AppError } from '../src/errors.js'
 
 const created: string[] = []
@@ -250,10 +251,21 @@ describe('sync · safety', () => {
 
   test('an unregistered table is rejected, never silently dropped', async () => {
     const userId = await newUser()
-    // `loans` is a valid sync_entity_type value but has no registry entry yet.
-    // Rejecting explicitly — rather than ignoring the key — is what stops a
-    // client silently losing writes to a table the server has not implemented.
-    const res = await push(userId, { loans: [{ id: uuidv7(), updatedAt: new Date().toISOString() }] }, [])
+    // A valid sync_entity_type value with no registry entry yet. Rejecting
+    // explicitly — rather than ignoring the key — is what stops a client
+    // silently losing writes to a table the server has not implemented.
+    //
+    // The guard below matters: this test previously used `loans`, and when the
+    // loans module shipped it quietly started asserting VALIDATION_FAILED
+    // instead. Pinning the precondition makes that a loud failure rather than a
+    // test that still passes while testing nothing.
+    const table = 'retirement_plans'
+    assert.ok(
+      !implementedTables().includes(table),
+      `${table} is now registered — pick another unimplemented sync_entity_type for this test`,
+    )
+
+    const res = await push(userId, { [table]: [{ id: uuidv7(), updatedAt: new Date().toISOString() }] }, [])
     assert.equal(res.rejected[0]?.reason, 'SYNC_TABLE_NOT_WRITABLE')
   })
 

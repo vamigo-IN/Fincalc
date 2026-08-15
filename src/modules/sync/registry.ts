@@ -166,6 +166,51 @@ const emergencyFund = z.object({
 })
 
 /**
+ * A loan. Bounds mirror `ck_loans__*` (migration 0005) and the Dart engine's
+ * validation, so the same input is rejected in the same place wherever it
+ * arrives from.
+ */
+const loan = z.object({
+  ...syncEnvelope,
+  loanType: z.enum([
+    'home', 'car', 'personal', 'education', 'gold', 'business',
+    'consumer_durable', 'credit_card_emi', 'other',
+  ]),
+  lenderName: z.string().max(120).default(''),
+  principalPaise: paise,
+  /** 0 is legal — "no cost EMI" is a real product. */
+  interestRateMicro: z.number().int().min(0).max(1_000_000),
+  tenureMonths: z.number().int().min(1).max(480),
+  startDate: isoDate,
+  /** 29-31 are legal; the scheduler clamps to the month's last day. */
+  emiDay: z.number().int().min(1).max(31).default(5),
+  emiPaise: paise,
+  outstandingPaise: paise,
+  prepaymentTotalPaise: paise.optional(),
+  status: z.enum(['active', 'closed', 'foreclosed', 'defaulted']).default('active'),
+})
+
+/**
+ * One instalment, or one prepayment. `instalmentNo` is null for a prepayment —
+ * `ck_loan_payments__prepayment_shape` enforces that the two never blur, because
+ * the schedule cannot be reconstructed from rows that do.
+ */
+const loanPayment = z.object({
+  ...syncEnvelope,
+  loanId: z.string().uuid(),
+  instalmentNo: z.number().int().min(1).max(480).nullable().optional(),
+  dueDate: isoDate,
+  paidOn: isoDate.nullable().optional(),
+  amountPaise: paise,
+  principalPaise: paise.optional(),
+  interestPaise: paise.optional(),
+  status: z
+    .enum(['scheduled', 'paid', 'part_paid', 'missed', 'prepayment'])
+    .default('scheduled'),
+  isPrepayment: z.boolean().default(false),
+})
+
+/**
  * User-created categories only. System rows (`user_id IS NULL`) are pull-only:
  * a push carrying one is rejected with ROW_NOT_OWNED, because the 18 seeded
  * defaults are shared by every account and a client must not be able to rename
@@ -199,6 +244,8 @@ export const SYNC_ENTITIES: readonly SyncEntity[] = [
   { table: 'transactions', model: 'transaction', schema: transaction, identity: ['occurredOn', 'id'] },
   { table: 'goal_contributions', model: 'goalContribution', schema: goalContribution, identity: ['id'] },
   { table: 'emergency_funds', model: 'emergencyFund', schema: emergencyFund, identity: ['id'] },
+  { table: 'loans', model: 'loan', schema: loan, identity: ['id'] },
+  { table: 'loan_payments', model: 'loanPayment', schema: loanPayment, identity: ['id'] },
   { table: 'saved_calculations', model: 'savedCalculation', schema: savedCalculation, identity: ['id'] },
   { table: 'credit_health_inputs', model: 'creditHealthInput', schema: creditHealthInput, identity: ['id'] },
 ]
