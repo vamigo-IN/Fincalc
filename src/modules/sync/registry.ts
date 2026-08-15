@@ -210,6 +210,44 @@ const loanPayment = z.object({
   isPrepayment: z.boolean().default(false),
 })
 
+const asset = z.object({
+  ...syncEnvelope,
+  name: z.string().min(1).max(120),
+  assetClass: z.enum([
+    'cash', 'bank_deposit', 'fd_rd', 'mutual_fund', 'equity', 'bonds_debt',
+    'ppf_epf_nps', 'gold', 'real_estate', 'insurance_cash_value', 'other',
+  ]),
+  /** Zero is legal — an emptied account someone still tracks. Negative is not. */
+  currentValuePaise: paise,
+  asOfDate: isoDate,
+  isLiquid: z.boolean().default(false),
+  institution: z.string().max(120).nullable().optional(),
+  linkedGoalId: z.string().uuid().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+})
+
+/**
+ * A debt NOT tracked as a loan — a credit card balance, money owed to family.
+ *
+ * `sourceLoanId` is the double-counting guard: a loan in the loans module
+ * already contributes its outstanding balance to net worth, and a liability row
+ * mirroring it would halve the user's apparent net worth on data they entered
+ * in good faith. `ux_liabilities__source_loan` allows at most one per loan.
+ */
+const liability = z.object({
+  ...syncEnvelope,
+  name: z.string().min(1).max(120),
+  liabilityType: z.enum([
+    'home_loan', 'car_loan', 'personal_loan', 'education_loan', 'gold_loan',
+    'credit_card', 'consumer_durable', 'business_loan', 'informal', 'other',
+  ]),
+  outstandingPaise: paise,
+  interestRateMicro: z.number().int().min(0).max(1_000_000).default(0),
+  asOfDate: isoDate,
+  sourceLoanId: z.string().uuid().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+})
+
 /**
  * User-created categories only. System rows (`user_id IS NULL`) are pull-only:
  * a push carrying one is rejected with ROW_NOT_OWNED, because the 18 seeded
@@ -246,6 +284,8 @@ export const SYNC_ENTITIES: readonly SyncEntity[] = [
   { table: 'emergency_funds', model: 'emergencyFund', schema: emergencyFund, identity: ['id'] },
   { table: 'loans', model: 'loan', schema: loan, identity: ['id'] },
   { table: 'loan_payments', model: 'loanPayment', schema: loanPayment, identity: ['id'] },
+  { table: 'assets', model: 'asset', schema: asset, identity: ['id'] },
+  { table: 'liabilities', model: 'liability', schema: liability, identity: ['id'] },
   { table: 'saved_calculations', model: 'savedCalculation', schema: savedCalculation, identity: ['id'] },
   { table: 'credit_health_inputs', model: 'creditHealthInput', schema: creditHealthInput, identity: ['id'] },
 ]
