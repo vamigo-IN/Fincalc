@@ -98,6 +98,58 @@ const creditHealthInput = z.object({
   selfReportedAt: isoDate,
 })
 
+
+const budget = z.object({
+  ...syncEnvelope,
+  periodMonth: isoDate,
+  incomePaise: paise,
+  plannedSavingsPaise: paise,
+  note: z.string().max(500).nullable().optional(),
+  closedAt: isoTimestamp.nullable().optional(),
+})
+
+const budgetCategory = z.object({
+  ...syncEnvelope,
+  budgetId: z.string().uuid(),
+  categoryId: z.string().uuid(),
+  allocatedPaise: paise,
+  rolloverEnabled: z.boolean().default(false),
+  sortOrder: z.number().int().min(0).max(32767).default(500),
+})
+
+const transaction = z.object({
+  ...syncEnvelope,
+  budgetId: z.string().uuid().nullable().optional(),
+  categoryId: z.string().uuid(),
+  amountPaise: paise,
+  txnType: z.enum(['expense', 'income', 'transfer']).default('expense'),
+  source: z.enum(['manual', 'quick_add', 'recurring', 'bridge', 'import']).default('manual'),
+  note: z.string().max(200).default(''),
+  /**
+   * REQUIRED, and part of the identity — see the `identity` field below.
+   * An IST calendar date (05 L7): an expense entered at 23:50 on 31 March
+   * belongs to FY 2025-26, and storing it as a timestamp then casting in UTC
+   * would move it into the next financial year.
+   */
+  occurredOn: isoDate,
+})
+
+/**
+ * User-created categories only. System rows (`user_id IS NULL`) are pull-only:
+ * a push carrying one is rejected with ROW_NOT_OWNED, because the 18 seeded
+ * defaults are shared by every account and a client must not be able to rename
+ * them for everyone.
+ */
+const expenseCategory = z.object({
+  ...syncEnvelope,
+  categoryKey: z.string().regex(/^[a-z][a-z0-9_]{1,39}$/),
+  name: z.string().min(1).max(60),
+  kind: z.enum(['essential', 'discretionary', 'savings', 'debt']).default('discretionary'),
+  iconKey: z.string().max(40).default('category'),
+  colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default('#607D8B'),
+  sortOrder: z.number().int().min(0).max(32767).default(500),
+})
+
 /**
  * Registered entities. The remaining `sync_entity_type` values are declared here
  * as NOT-YET-IMPLEMENTED rather than omitted, so the startup assertion below
@@ -105,6 +157,15 @@ const creditHealthInput = z.object({
  */
 export const SYNC_ENTITIES: readonly SyncEntity[] = [
   { table: 'goals', model: 'goal', schema: goal, identity: ['id'] },
+  { table: 'expense_categories', model: 'expenseCategory', schema: expenseCategory, identity: ['id'] },
+  { table: 'budgets', model: 'budget', schema: budget, identity: ['id'] },
+  { table: 'budget_categories', model: 'budgetCategory', schema: budgetCategory, identity: ['id'] },
+  // `occurredOn` is in the identity from v1, BEFORE the table is partitioned
+  // (05 R3). Once transactions is RANGE-partitioned by month its primary key
+  // becomes (occurred_on, id), and a payload that omitted the date would become
+  // unroutable — making partitioning a breaking wire change instead of a
+  // migration nobody notices.
+  { table: 'transactions', model: 'transaction', schema: transaction, identity: ['occurredOn', 'id'] },
   { table: 'goal_contributions', model: 'goalContribution', schema: goalContribution, identity: ['id'] },
   { table: 'saved_calculations', model: 'savedCalculation', schema: savedCalculation, identity: ['id'] },
   { table: 'credit_health_inputs', model: 'creditHealthInput', schema: creditHealthInput, identity: ['id'] },

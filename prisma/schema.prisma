@@ -646,9 +646,16 @@ model ExpenseCategory {
   colorHex     String    @default("#607D8B") @map("color_hex") @db.Char(7)
   sortOrder    Int       @default(500) @map("sort_order") @db.SmallInt
   parentId     String?   @map("parent_id") @db.Uuid
-  /// GENERATED ALWAYS AS (user_id IS NULL) STORED — see §9.4. Prisma cannot declare it; the column
-  /// is created in raw SQL and is read-only here.
-  isSystem     Boolean   @map("is_system")
+  // `is_system` is DELIBERATELY ABSENT from this model.
+  //
+  // It is a Postgres generated column, GENERATED ALWAYS AS (user_id IS NULL)
+  // STORED, created by migration 0004. Prisma cannot express that: `@default`
+  // makes Prisma SUPPLY the value rather than omit it, and Postgres then rejects
+  // the insert with "cannot insert a non-DEFAULT value into a generated column".
+  //
+  // Nothing is lost — the value is derivable as `userId === null` in TypeScript.
+  // The column exists so the partial unique indexes and SQL-side queries can use
+  // it. Prisma ignores unknown columns, so this is safe.
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)

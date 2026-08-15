@@ -23,8 +23,10 @@ async function newUser(): Promise<string> {
     data: {
       id,
       email: `sync-${id}@test.local`,
-      // A real bcrypt shape: the users table has a CHECK that rejects anything else.
-      passwordHash: '$2b$11$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012',
+      // A REAL bcrypt hash. ck_users__bcrypt_shape requires exactly 53 chars
+      // after the $2b$NN$ prefix; the earlier placeholder had 55 and was
+      // silently accepted only because the constraint did not exist yet.
+      passwordHash: '$2b$10$kU3wmcKFsAv/tKag/Oqwa.6L4DyPjWaIirUcMYfio32zBbbuOGIcW',
     },
   })
   await db.syncState.create({ data: { userId: id } })
@@ -88,7 +90,16 @@ describe('sync · pull', () => {
     const userId = await newUser()
     await push(userId, { goals: [goalRow()] }, [])
     // Simulate the tombstone-purge job having advanced the horizon.
-    await db.syncState.update({ where: { userId }, data: { minRetainedRev: 100n } })
+    //
+    // Both counters move: ck_sync_state__horizon enforces
+    // min_retained_rev <= rev_counter, because the purge job can only advance
+    // the horizon up to revisions that actually exist. The earlier version of
+    // this test set the horizon ABOVE the counter — a state the database now
+    // correctly refuses to represent.
+    await db.syncState.update({
+      where: { userId },
+      data: { revCounter: 120n, minRetainedRev: 100n },
+    })
 
     await assert.rejects(
       () => pull(userId, 5n),
@@ -239,8 +250,38 @@ describe('sync · safety', () => {
 
   test('an unregistered table is rejected, never silently dropped', async () => {
     const userId = await newUser()
-    const res = await push(userId, { transactions: [{ id: uuidv7(), updatedAt: new Date().toISOString() }] }, [])
+    // `loans` is a valid sync_entity_type value but has no registry entry yet.
+    // Rejecting explicitly — rather than ignoring the key — is what stops a
+    // client silently losing writes to a table the server has not implemented.
+    const res = await push(userId, { loans: [{ id: uuidv7(), updatedAt: new Date().toISOString() }] }, [])
     assert.equal(res.rejected[0]?.reason, 'SYNC_TABLE_NOT_WRITABLE')
+  })
+
+  test('a newly registered table (transactions) IS writable', async () => {
+    const userId = await newUser()
+    const category = await db.expenseCategory.findFirst({
+      where: { userId: null, categoryKey: 'groceries' },
+      select: { id: true },
+    })
+    assert.ok(category, 'seed must have run: expense_categories is empty')
+
+    const res = await push(userId, {
+      transactions: [{
+        id: uuidv7(),
+        categoryId: category.id,
+        amountPaise: '45000',
+        txnType: 'expense',
+        source: 'quick_add',
+        note: 'Auto',
+        // Carried from v1, before partitioning makes it part of the key (05 R3).
+        occurredOn: '2026-08-09',
+        updatedAt: new Date().toISOString(),
+      }],
+    }, [])
+
+    assert.equal(res.applied.transactions, 1, JSON.stringify(res.rejected))
+    const pulled = await pull(userId, 0n)
+    assert.equal((pulled.changes.transactions as unknown[]).length, 1)
   })
 
   test('a malformed row is rejected without failing its whole batch', async () => {

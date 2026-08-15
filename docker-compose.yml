@@ -97,7 +97,7 @@ services:
     image: fincalc-api:local
     container_name: fincalc_migrate
     restart: "no"
-    command: ["sh", "-c", "npx prisma migrate deploy"]
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/prisma/seed.js"]
     environment:
       DATABASE_URL: postgresql://fincalc_owner:${POSTGRES_PASSWORD:-fincalc_dev_only}@fincalc_postgres:5432/fincalc?schema=public
     depends_on:
