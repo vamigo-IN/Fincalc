@@ -249,6 +249,41 @@ const liability = z.object({
 })
 
 /**
+ * A retirement plan. Bounds mirror `ck_retirement__ages` (migration 0004), and
+ * the cross-field ordering is enforced here too — Zod can reject
+ * `retirementAge <= currentAge` with a message naming the field, where the
+ * database can only refuse the write.
+ *
+ * `ux_retirement_plans__primary` allows one primary plan per user; additional
+ * scenarios are legal with `isPrimary: false`.
+ */
+const retirementPlan = z
+  .object({
+    ...syncEnvelope,
+    name: z.string().max(120).default('My retirement'),
+    currentAge: z.number().int().min(15).max(100),
+    retirementAge: z.number().int().min(16).max(110),
+    lifeExpectancy: z.number().int().min(17).max(120).default(85),
+    currentCorpusPaise: paise,
+    monthlyContributionPaise: paise,
+    preReturnRateMicro: z.number().int().min(-500_000).max(1_000_000).default(120_000),
+    postReturnRateMicro: z.number().int().min(-500_000).max(1_000_000).default(70_000),
+    inflationRateMicro: z.number().int().min(0).max(500_000).default(60_000),
+    desiredMonthlyIncomePaise: paise,
+    epfBalancePaise: paise.optional(),
+    npsBalancePaise: paise.optional(),
+    isPrimary: z.boolean().default(true),
+  })
+  .refine((p) => p.retirementAge > p.currentAge, {
+    message: 'retirementAge must be greater than currentAge',
+    path: ['retirementAge'],
+  })
+  .refine((p) => p.lifeExpectancy > p.retirementAge, {
+    message: 'lifeExpectancy must be greater than retirementAge',
+    path: ['lifeExpectancy'],
+  })
+
+/**
  * User-created categories only. System rows (`user_id IS NULL`) are pull-only:
  * a push carrying one is rejected with ROW_NOT_OWNED, because the 18 seeded
  * defaults are shared by every account and a client must not be able to rename
@@ -286,6 +321,7 @@ export const SYNC_ENTITIES: readonly SyncEntity[] = [
   { table: 'loan_payments', model: 'loanPayment', schema: loanPayment, identity: ['id'] },
   { table: 'assets', model: 'asset', schema: asset, identity: ['id'] },
   { table: 'liabilities', model: 'liability', schema: liability, identity: ['id'] },
+  { table: 'retirement_plans', model: 'retirementPlan', schema: retirementPlan, identity: ['id'] },
   { table: 'saved_calculations', model: 'savedCalculation', schema: savedCalculation, identity: ['id'] },
   { table: 'credit_health_inputs', model: 'creditHealthInput', schema: creditHealthInput, identity: ['id'] },
 ]
