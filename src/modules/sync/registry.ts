@@ -135,6 +135,37 @@ const transaction = z.object({
 })
 
 /**
+ * The emergency fund is a SINGLETON per user — `ux_emergency_funds__user` is a
+ * unique index on (user_id) WHERE deleted_at IS NULL (migration 0004). Two
+ * devices each creating a fund offline will therefore collide on push, and the
+ * loser is resolved by the same last-write-wins rule as any other row rather
+ * than by a bespoke code path.
+ *
+ * `targetMonths` is bounded 3..12 to match `ck_emergency_funds__months`. Zod
+ * rejecting it here turns a database CHECK violation — which surfaces as an
+ * opaque sync failure — into a validation error naming the field.
+ */
+const emergencyFund = z.object({
+  ...syncEnvelope,
+  monthlyEssentialPaise: paise,
+  dependants: z.number().int().min(0).max(20).default(0),
+  incomeStability: z
+    .enum(['salaried_stable', 'salaried_variable', 'self_employed', 'single_income'])
+    .default('salaried_stable'),
+  targetMonths: z.number().int().min(3).max(12).default(6),
+  currentCorpusPaise: paise,
+  monthlyFundingPaise: paise,
+  linkedGoalId: z.string().uuid().nullable().optional(),
+  /**
+   * True while the essentials figure tracks logged spend. Once the user types
+   * their own number this flips false and the derivation stops overwriting it —
+   * without the flag, a month with few logged expenses would silently shrink
+   * someone's target.
+   */
+  essentialsAutoDerived: z.boolean().default(true),
+})
+
+/**
  * User-created categories only. System rows (`user_id IS NULL`) are pull-only:
  * a push carrying one is rejected with ROW_NOT_OWNED, because the 18 seeded
  * defaults are shared by every account and a client must not be able to rename
@@ -167,6 +198,7 @@ export const SYNC_ENTITIES: readonly SyncEntity[] = [
   // migration nobody notices.
   { table: 'transactions', model: 'transaction', schema: transaction, identity: ['occurredOn', 'id'] },
   { table: 'goal_contributions', model: 'goalContribution', schema: goalContribution, identity: ['id'] },
+  { table: 'emergency_funds', model: 'emergencyFund', schema: emergencyFund, identity: ['id'] },
   { table: 'saved_calculations', model: 'savedCalculation', schema: savedCalculation, identity: ['id'] },
   { table: 'credit_health_inputs', model: 'creditHealthInput', schema: creditHealthInput, identity: ['id'] },
 ]
