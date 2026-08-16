@@ -2,8 +2,12 @@
 
 Node 22 · Express 5 · TypeScript (strict) · Prisma 6 · PostgreSQL 17 · Redis 7
 
-Design documents live in [`../docs/fincalc-2.0/`](../docs/fincalc-2.0/00-README.md). Where this code and
-a document disagree, the code is what runs — open an issue and fix the document.
+**This repository is the server only.** It is published from a monorepo that also holds the Flutter
+app, the shared Dart engines and the architecture documents; only `server/` is mirrored here, so a
+deploy pulls the backend and nothing else. The design documents referenced in comments live in that
+monorepo under `docs/fincalc-2.0/`. Where this code and a document disagree, the code is what runs.
+
+Deployment: [DEPLOY.md](DEPLOY.md).
 
 ---
 
@@ -75,11 +79,15 @@ npm run dev                   # tsx watch, loads .env
 | **Goals** — CRUD, free-tier cap, soft delete + tombstone, projection | ✅ |
 | **Rate limiting** — Redis, per bucket | ✅ |
 | **Admin dashboard** — `/admin`, server-rendered | ✅ users, entitlements, rules, flags, system |
-| Sync, budget, net worth, dashboard, advisor | ⛔ not started |
-| Flutter integration | ⛔ not started |
+| **Sync** — GET/POST `/v1/sync`, LWW, tombstones, per-user revisions | ✅ 13 registered entities |
+| Flutter integration — offline-first client, syncs against this API | ✅ |
 
-The API is deliberately **narrow and deep** rather than wide and hollow: two real features that work end
-to end, on foundations the rest can be built on.
+Registered sync entities: goals, goal contributions, expense categories, budgets, budget categories,
+transactions, saved calculations, credit health inputs, emergency funds, loans, loan payments, assets,
+liabilities, retirement plans, calendar events.
+
+The client holds a full local replica and works offline; this API is the sync authority and the owner
+of anything that must not live only on a phone.
 
 ---
 
@@ -90,7 +98,8 @@ published APK. Extracting it takes about two minutes.
 
 **Rotate it at exchangerate-api.com and put the new key in `.env` — server-side only.** Deleting the
 constant from the app does not undo the exposure: the key remains in git history and on every phone that
-already has FinCalc installed. See [docs 18 §10](../docs/fincalc-2.0/18-currency-rate-service.md).
+already has FinCalc installed. The rate service caches
+aggressively so the free tier is never at risk — see `src/modules/reference/fx.service.ts`.
 
 Without a key the API still starts; `/v1/reference/rates` serves from cache or Postgres and reports
 `RATES_UNAVAILABLE` honestly if it has neither.
