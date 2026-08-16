@@ -153,6 +153,24 @@ dig +short fincalc.vamigo.in
 
 ### 2. nginx
 
+A ready-to-use file is in this repo at
+[`deploy/nginx/fincalc.vamigo.in.conf`](deploy/nginx/fincalc.vamigo.in.conf):
+
+```bash
+sudo cp deploy/nginx/fincalc.vamigo.in.conf /etc/nginx/sites-available/fincalc
+sudo ln -s /etc/nginx/sites-available/fincalc /etc/nginx/sites-enabled/fincalc
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+It is **HTTP-only on purpose** — certbot answers a challenge on port 80 before a certificate exists,
+then rewrites the file to add TLS. A TLS block referencing a certificate that is not there yet makes
+`nginx -t` fail and blocks issuance.
+
+It is also a **separate site file**, not an addition to an existing one, so a certbot rewrite for this
+name can never touch the block serving another site on the same box.
+
+The full block, for reference:
+
 ```nginx
 server {
     listen 80;
@@ -189,7 +207,10 @@ server {
 
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # $remote_addr, not $proxy_add_x_forwarded_for — the latter APPENDS to
+        # whatever the client sent, leaving everything before the last entry
+        # under their control. See the note in deploy/nginx/.
+        proxy_set_header X-Forwarded-For   $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
 
         # Longer than the API's own 15s REQUEST_TIMEOUT_MS, so the API decides
@@ -199,10 +220,24 @@ server {
 }
 ```
 
-`X-Forwarded-For` is not optional. Rate limiting and the audit log record an IP **prefix**, and
-without the header every request looks like it came from the proxy — which turns per-IP limits into
-one shared bucket for the entire internet, and makes the audit log useless. The API already runs with
-`trust proxy = 1`, which trusts exactly one hop: the proxy in front of it, and nothing further out.
+`X-Forwarded-For` is not optional, and **which form you use matters**.
+
+Without the header at all, every request looks like it came from the proxy — per-IP rate limits become
+one shared bucket for the entire internet and the audit log records nothing useful.
+
+With `$proxy_add_x_forwarded_for`, nginx appends to whatever the client sent, so the client controls
+every entry but the last. The API runs with `trust proxy = 1` and reads the rightmost entry, so it
+would still resolve correctly today — but that safety depends on the trust setting and the header form
+agreeing, and one of them changing later silently turns a client-written header into an identity the
+server believes.
+
+`$remote_addr` is the real TCP peer. Nothing forged can enter the header, so there is nothing to
+reason about.
+
+> **If another site on this host uses `$proxy_add_x_forwarded_for` and its application reads the
+> FIRST entry, that application's per-IP limits are bypassable** — a fresh `X-Forwarded-For` per
+> request defeats them, including on a login endpoint. Worth checking separately; it is not something
+> this repository can fix.
 
 ### 3. Certificate
 
