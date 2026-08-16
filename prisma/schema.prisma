@@ -1079,11 +1079,11 @@ model CreditHealthInput {
   userId                String    @map("user_id") @db.Uuid
   activeLoanCount       Int       @default(0) @map("active_loan_count") @db.SmallInt
   creditCardCount       Int       @default(0) @map("credit_card_count") @db.SmallInt
-  totalCardLimitPaise   BigInt    @default(0) @map("total_card_limit_paise")
-  totalCardBalancePaise BigInt    @default(0) @map("total_card_balance_paise")
-  missedPayments12m     Int       @default(0) @map("missed_payments_12m") @db.SmallInt
-  oldestAccountMonths   Int       @default(0) @map("oldest_account_months") @db.SmallInt
-  recentEnquiries6m     Int       @default(0) @map("recent_enquiries_6m") @db.SmallInt
+  totalCardLimitPaise   BigInt?   @map("total_card_limit_paise")
+  totalCardBalancePaise BigInt?   @map("total_card_balance_paise")
+  missedPayments12m     Int?      @map("missed_payments_12m") @db.SmallInt
+  oldestAccountMonths   Int?      @map("oldest_account_months") @db.SmallInt
+  recentEnquiries6m     Int?      @map("recent_enquiries_6m") @db.SmallInt
   hasSecuredLoan        Boolean   @default(false) @map("has_secured_loan")
   selfReportedAt        DateTime  @default(now()) @map("self_reported_at") @db.Date
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)

@@ -85,15 +85,27 @@ const savedCalculation = z.object({
   isPinned: z.boolean().default(false),
 })
 
+/**
+ * Self-reported credit answers.
+ *
+ * The five ANSWER fields are nullable, and null means "not answered" (migration
+ * 0007). They are not optional-with-a-default, because a defaulted 0 in
+ * `missedPayments12m` would read as the strongest possible status on the
+ * highest-weighted factor — the module would award full marks on payment
+ * history to a user who has answered nothing.
+ *
+ * `activeLoanCount` and `creditCardCount` keep their defaults: those are
+ * derived from the loans module rather than asked, so 0 genuinely means zero.
+ */
 const creditHealthInput = z.object({
   ...syncEnvelope,
-  activeLoanCount: z.number().int().min(0).max(50),
-  creditCardCount: z.number().int().min(0).max(30),
-  totalCardLimitPaise: paise,
-  totalCardBalancePaise: paise,
-  missedPayments12m: z.number().int().min(0).max(60),
-  oldestAccountMonths: z.number().int().min(0).max(900),
-  recentEnquiries6m: z.number().int().min(0).max(50),
+  activeLoanCount: z.number().int().min(0).max(50).default(0),
+  creditCardCount: z.number().int().min(0).max(30).default(0),
+  totalCardLimitPaise: paise.nullable().optional(),
+  totalCardBalancePaise: paise.nullable().optional(),
+  missedPayments12m: z.number().int().min(0).max(60).nullable().optional(),
+  oldestAccountMonths: z.number().int().min(0).max(900).nullable().optional(),
+  recentEnquiries6m: z.number().int().min(0).max(50).nullable().optional(),
   hasSecuredLoan: z.boolean().default(false),
   selfReportedAt: isoDate,
 })
