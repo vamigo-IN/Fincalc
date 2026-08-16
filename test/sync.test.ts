@@ -259,7 +259,7 @@ describe('sync · safety', () => {
     // loans module shipped it quietly started asserting VALIDATION_FAILED
     // instead. Pinning the precondition makes that a loud failure rather than a
     // test that still passes while testing nothing.
-    const table = 'calendar_events'
+    const table = 'asset_valuations'
     assert.ok(
       !implementedTables().includes(table),
       `${table} is now registered — pick another unimplemented sync_entity_type for this test`,

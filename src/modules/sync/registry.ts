@@ -296,6 +296,39 @@ const retirementPlan = z
   })
 
 /**
+ * A dated financial commitment.
+ *
+ * `dueOn` is the ANCHOR date, not a materialised occurrence: a monthly event is
+ * one row, and the client expands it. Storing every occurrence would mean a
+ * 20-year home loan writing 240 rows that all say the same thing, and a change
+ * of EMI date rewriting all of them.
+ *
+ * `isAuto` rows are DERIVED from a loan or goal and are read-only to the user —
+ * editing one would put it out of step with the module that owns the fact.
+ */
+const calendarEvent = z.object({
+  ...syncEnvelope,
+  eventType: z.enum([
+    'emi_due', 'sip_due', 'goal_contribution', 'bill_due', 'insurance_premium',
+    'tax_due', 'gst_due', 'fd_maturity', 'rd_maturity', 'budget_close', 'custom',
+  ]),
+  title: z.string().min(1).max(120),
+  amountPaise: paise.nullable().optional(),
+  dueOn: isoDate,
+  recurrence: z
+    .enum(['once', 'daily', 'weekly', 'monthly', 'quarterly', 'half_yearly', 'yearly'])
+    .default('once'),
+  recurrenceUntil: isoDate.nullable().optional(),
+  status: z
+    .enum(['scheduled', 'notified', 'paid', 'skipped', 'missed'])
+    .default('scheduled'),
+  remindDaysBefore: z.number().int().min(0).max(30).default(1),
+  sourceLoanId: z.string().uuid().nullable().optional(),
+  sourceGoalId: z.string().uuid().nullable().optional(),
+  isAuto: z.boolean().default(false),
+})
+
+/**
  * User-created categories only. System rows (`user_id IS NULL`) are pull-only:
  * a push carrying one is rejected with ROW_NOT_OWNED, because the 18 seeded
  * defaults are shared by every account and a client must not be able to rename
@@ -334,6 +367,7 @@ export const SYNC_ENTITIES: readonly SyncEntity[] = [
   { table: 'assets', model: 'asset', schema: asset, identity: ['id'] },
   { table: 'liabilities', model: 'liability', schema: liability, identity: ['id'] },
   { table: 'retirement_plans', model: 'retirementPlan', schema: retirementPlan, identity: ['id'] },
+  { table: 'calendar_events', model: 'calendarEvent', schema: calendarEvent, identity: ['id'] },
   { table: 'saved_calculations', model: 'savedCalculation', schema: savedCalculation, identity: ['id'] },
   { table: 'credit_health_inputs', model: 'creditHealthInput', schema: creditHealthInput, identity: ['id'] },
 ]
