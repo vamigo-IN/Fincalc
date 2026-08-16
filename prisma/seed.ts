@@ -46,11 +46,18 @@ async function seedAdmin(): Promise<string> {
   const supplied = process.env.ADMIN_PASSWORD?.trim()
 
   if (!supplied && config.isProd) {
-    throw new Error(
-      'Refusing to seed an admin with a generated password in production. ' +
-        'Set ADMIN_PASSWORD to a value you control — a password that exists ' +
-        'only in a deploy log cannot be rotated and can be read by anyone with ' +
-        'log access.',
+    // SKIPPED, not thrown. This runs inside fincalc_migrate, which the API
+    // waits on: throwing here fails the container, and a missing OPTIONAL
+    // admin password would then block the entire deploy — migrations applied,
+    // API never started, over an account nobody asked for yet.
+    //
+    // Still refusing to generate one, for the original reason: a credential
+    // that exists only in a deploy log cannot be rotated and can be read by
+    // anyone with log access.
+    return (
+      'admin NOT created — ADMIN_PASSWORD is unset and one will not be ' +
+      'generated in production. Create it with: ' +
+      'docker compose exec fincalc_api npx tsx scripts/reset-admin.ts'
     )
   }
 

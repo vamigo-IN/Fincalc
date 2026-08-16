@@ -40,14 +40,15 @@ existing reverse proxy.
 ```bash
 cp .env.example .env          # then set EXCHANGERATE_API_KEY (see below)
 npm install
-docker compose up -d          # postgres + redis + migrate + api
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# or: npm run dev:up            # postgres + redis + migrate + api
 curl http://127.0.0.1:8087/v1/health/ready
 ```
 
 Local development against the containerised datastores:
 
 ```bash
-docker compose up -d fincalc_postgres fincalc_redis
+npm run infra:up
 npm run dev                   # tsx watch, loads .env
 ```
 
@@ -113,7 +114,7 @@ creates the 44 tables. It is not a running service and costs nothing after it ex
 database is empty and the API has nothing to talk to.
 
 **`fincalc_net` is `internal: true`, so Docker silently ignores `ports:` on anything attached only to
-it.** That is why `docker-compose.override.yml` also puts Postgres and Redis on `fincalc_edge` for
+it.** That is why `docker-compose.dev.yml` also puts Postgres and Redis on `fincalc_edge` for
 development. Production keeps them internal and publishes nothing.
 
 Three Prisma-in-Docker traps are already handled in the `Dockerfile`, each with a comment: the CLI is a

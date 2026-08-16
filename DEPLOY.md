@@ -86,6 +86,22 @@ curl http://127.0.0.1:8087/v1/health/ready
 stops; a stopped `fincalc_migrate` in `docker ps -a` is the expected end state. Without it the database
 is empty and the API has nothing to talk to.
 
+It runs `prisma migrate deploy` followed by the seed, which inserts the 18 expense categories, the
+learning categories, the feature flags and — if `ADMIN_PASSWORD` is set — the admin account. Every
+statement is an upsert on a natural key, so running it again on an existing database changes nothing.
+It exists as a separate one-shot container rather than as a step inside the API so that N API replicas
+can never race each other for Prisma's advisory lock.
+
+**Plain `docker compose up -d` is the production configuration.** Development needs the flags:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d    # or: npm run dev:up
+```
+
+That direction is deliberate. Forgetting the flag in development gets you production settings locally,
+which is harmless; the reverse would give you `NODE_ENV=development` on the VPS, with fail-fast on
+missing secrets disabled.
+
 ### Updating
 
 ```bash
@@ -300,6 +316,8 @@ ever be verified again — a database backup without it is unusable for logging 
 | Symptom | Cause |
 |---|---|
 | `range of CPUs is from 0.01 to 1.00, as there are only 1 CPUs available` | A `*_CPUS` value exceeds the host's core count. Check `nproc` and lower it in `.env`. See below. |
+| `service "fincalc_migrate" didn't complete successfully: exit 1` | Read `docker compose logs fincalc_migrate`. Almost always a missing variable: the seed imports `config.ts`, which validates the **whole** environment and exits naming what it wants. |
+| `fincalc_redis failed to start` alongside a migrate failure | Compose reports the dependency, not the cause. The migrate container is the one to read logs from. |
 | Exits at boot naming a variable | That variable is missing from `.env`. The message says which. |
 | Exits complaining about a port | A blocked port is set in `.env`. Pick another. |
 | `/health/ready` reports postgres down | `fincalc_migrate` may not have run; check `docker compose ps`. |

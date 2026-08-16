@@ -19,6 +19,40 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# ONE environment, shared by fincalc_api and fincalc_migrate.
+#
+# They run the same image and the seed imports src/config.ts, which validates
+# the WHOLE environment and exits on anything missing — so the migration job
+# needs every variable the API needs, even the ones it never uses.
+#
+# This was two separate blocks, and migrate had only DATABASE_URL. It worked
+# until the seed learned to create the admin account, which pulled in config;
+# after that every production-required variable was a fresh way for the deploy
+# to fail with `exit 1` after the migration had already applied. An anchor makes
+# drift impossible: a variable added for the API is automatically present here.
+#
+# There is no .env inside the image (.dockerignore excludes it), so nothing is
+# filled in implicitly. Absent here means absent.
+x-api-env: &api-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://fincalc_owner:${POSTGRES_PASSWORD:-fincalc_dev_only}@fincalc_postgres:5432/fincalc?schema=public
+  REDIS_URL: redis://fincalc_redis:6379
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY:-}
+  # `:?` fails fast with a readable message instead of starting a container that
+  # exits a second later.
+  PASSWORD_PEPPER: ${PASSWORD_PEPPER:?set PASSWORD_PEPPER in .env}
+  AUDIT_PEPPER: ${AUDIT_PEPPER:?set AUDIT_PEPPER in .env}
+  JWT_SIGNING_KEYS: ${JWT_SIGNING_KEYS:?set JWT_SIGNING_KEYS in .env — see DEPLOY.md}
+  JWT_CURRENT_KID: ${JWT_CURRENT_KID:-k1}
+  JWT_ISSUER: ${JWT_ISSUER:-https://fincalc.vamigo.in}
+  JWT_AUDIENCE: ${JWT_AUDIENCE:-fincalc-app}
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+  BCRYPT_COST: ${BCRYPT_COST:-11}
+  RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
+  RATE_LIMIT_WRITE_MAX: ${RATE_LIMIT_WRITE_MAX:-120}
+
 services:
   fincalc_postgres:
     image: postgres:17.5-bookworm
@@ -122,10 +156,13 @@ services:
     container_name: fincalc_migrate
     restart: "no"
     command: ["sh", "-c", "npx prisma migrate deploy && node dist/prisma/seed.js"]
-    environment:
-      DATABASE_URL: postgresql://fincalc_owner:${POSTGRES_PASSWORD:-fincalc_dev_only}@fincalc_postgres:5432/fincalc?schema=public
+    environment: *api-env
     depends_on:
       fincalc_postgres: { condition: service_healthy }
+      # Not because the seed uses Redis, but because config demands a valid
+      # REDIS_URL and the API waits on this container: starting the migration
+      # before Redis is up only moves the failure later.
+      fincalc_redis: { condition: service_healthy }
     networks: [fincalc_net]
 
   fincalc_api:
@@ -137,20 +174,8 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
-      NODE_ENV: production
+      <<: *api-env
       PORT: 8087
-      DATABASE_URL: postgresql://fincalc_owner:${POSTGRES_PASSWORD:-fincalc_dev_only}@fincalc_postgres:5432/fincalc?schema=public
-      REDIS_URL: redis://fincalc_redis:6379
-      EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY:-}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      PASSWORD_PEPPER: ${PASSWORD_PEPPER:?set PASSWORD_PEPPER in .env}
-      AUDIT_PEPPER: ${AUDIT_PEPPER:?set AUDIT_PEPPER in .env}
-      JWT_SIGNING_KEYS: ${JWT_SIGNING_KEYS:-}
-      JWT_CURRENT_KID: ${JWT_CURRENT_KID:-k1}
-      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
-      BCRYPT_COST: ${BCRYPT_COST:-11}
-      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
-      RATE_LIMIT_WRITE_MAX: ${RATE_LIMIT_WRITE_MAX:-120}
     ports:
       # Loopback only. The host's existing reverse proxy fronts this (docs 09 §2).
       - "127.0.0.1:8087:8087"

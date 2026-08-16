@@ -1,0 +1,36 @@
+# Development overrides — OPT IN, never automatic.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#   (or: npm run dev:up)
+#
+# THIS FILE USED TO BE docker-compose.override.yml, which Docker auto-loads.
+# That meant a plain `docker compose up -d` on the VPS silently ran the API with
+# NODE_ENV=development: fail-fast on missing production secrets disabled, debug
+# logging on, and the datastores attached to a routable network. It also pointed
+# at a `compose.prod.yml` that was never written, so the documented production
+# command could not have worked.
+#
+# Renamed so the DEFAULT is production. Forgetting the flag in development gets
+# you production settings locally, which is harmless; the other way round is
+# not, and is exactly what happened.
+#
+# WHY THIS FILE EXISTS: `fincalc_net` is `internal: true`, and Docker cannot
+# publish a host port for a container attached ONLY to an internal network — the
+# `ports:` entry is silently ignored. So to reach Postgres/Redis from the host
+# with psql or redis-cli during development, they must also join a routable
+# network. Attaching `fincalc_edge` here keeps the production topology honest
+# (data services isolated) while making local work possible.
+#
+# Host ports remain 5442 / 6389 — never the VPS's occupied 5432/5433/6379.
+
+services:
+  fincalc_postgres:
+    networks: [fincalc_net, fincalc_edge]
+
+  fincalc_redis:
+    networks: [fincalc_net, fincalc_edge]
+
+  fincalc_api:
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug

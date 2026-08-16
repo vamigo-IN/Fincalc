@@ -19,7 +19,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
-    "infra:up": "docker compose up -d fincalc_postgres fincalc_redis",
+    "dev:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
+    "infra:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d fincalc_postgres fincalc_redis",
     "infra:down": "docker compose down",
     "infra:logs": "docker compose logs -f"
   },
