@@ -235,6 +235,49 @@ docker compose ps                       # fincalc_migrate exited 0 is correct
 
 ---
 
+## Sizing it for the host
+
+Defaults suit **1 vCPU and about 2GB**, shared with whatever else the machine
+already runs. Check what you have:
+
+```bash
+nproc                  # cores
+free -m                # memory
+docker stats --no-stream
+```
+
+**No `*_CPUS` value may exceed the core count.** Docker refuses to create the
+container and the stack does not start:
+
+```
+Error response from daemon: range of CPUs is from 0.01 to 1.00,
+as there are only 1 CPUs available
+```
+
+The limits are ceilings, not reservations, so they may sum to more than the host
+has — each says "no more than this", not "set this aside". The memory ceilings
+do add up in practice though, and their total should leave room for the OS, the
+reverse proxy and any neighbouring stacks.
+
+| | Default (1 vCPU) | 4 vCPU / 8GB |
+|---|---|---|
+| `API_CPUS` / `API_MEMORY` | 0.9 / 384M | 2 / 512M |
+| `PG_CPUS` / `PG_MEMORY` | 0.7 / 640M | 2 / 1536M |
+| `REDIS_CPUS` / `REDIS_MEMORY` | 0.3 / 160M | 0.5 / 256M |
+| `PG_SHARED_BUFFERS` | 160MB | 384MB |
+| `PG_EFFECTIVE_CACHE` | 384MB | 1GB |
+| `PG_MAX_CONNECTIONS` | 50 | 100 |
+
+Set them in `.env` and `docker compose up -d` again. Nothing needs rebuilding —
+these are runtime limits, not baked into the image.
+
+A single core is enough for this workload: the app is offline-first, so the
+device holds a full local replica and the server sees sync batches rather than
+every read. What a small box will feel first is **bcrypt on login** — if sign-in
+gets slow under load, lower `BCRYPT_COST` to 10 before adding hardware.
+
+---
+
 ## Backups
 
 The data worth protecting is Postgres. Redis holds only cache, rate-limit counters and admin sessions —
@@ -256,6 +299,7 @@ ever be verified again — a database backup without it is unusable for logging 
 
 | Symptom | Cause |
 |---|---|
+| `range of CPUs is from 0.01 to 1.00, as there are only 1 CPUs available` | A `*_CPUS` value exceeds the host's core count. Check `nproc` and lower it in `.env`. See below. |
 | Exits at boot naming a variable | That variable is missing from `.env`. The message says which. |
 | Exits complaining about a port | A blocked port is set in `.env`. Pick another. |
 | `/health/ready` reports postgres down | `fincalc_migrate` may not have run; check `docker compose ps`. |

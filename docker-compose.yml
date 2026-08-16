@@ -32,13 +32,24 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fincalc_dev_only}
       POSTGRES_INITDB_ARGS: "--data-checksums"
       TZ: UTC
+    # Sized for a SMALL box by default — 1 vCPU, ~2GB, shared with whatever else
+    # the host already runs. The original values (384MB buffers, 1GB cache,
+    # 100 connections) assumed a 4-vCPU machine this stack does not have.
+    #
+    # On a bigger host, raise these in .env rather than editing here:
+    #   PG_SHARED_BUFFERS=384MB PG_EFFECTIVE_CACHE=1GB PG_MAX_CONNECTIONS=100
+    #
+    # shared_buffers wants roughly a quarter of what Postgres is allowed, and
+    # effective_cache_size is only an ESTIMATE of the OS page cache — it
+    # allocates nothing, but setting it above what the machine has makes the
+    # planner choose index scans that then hit disk.
     command: >
       postgres
-        -c shared_buffers=384MB
-        -c effective_cache_size=1GB
-        -c work_mem=8MB
-        -c maintenance_work_mem=128MB
-        -c max_connections=100
+        -c shared_buffers=${PG_SHARED_BUFFERS:-160MB}
+        -c effective_cache_size=${PG_EFFECTIVE_CACHE:-384MB}
+        -c work_mem=${PG_WORK_MEM:-4MB}
+        -c maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-64MB}
+        -c max_connections=${PG_MAX_CONNECTIONS:-50}
         -c log_min_duration_statement=500
         -c log_checkpoints=on
         -c log_lock_waits=on
@@ -58,7 +69,18 @@ services:
     networks: [fincalc_net]
     deploy:
       resources:
-        limits: { cpus: "1.5", memory: 1536M }
+        # CPUS MUST NOT EXCEED THE HOST'S CORE COUNT. Docker refuses to create
+        # the container otherwise — "range of CPUs is from 0.01 to 1.00, as
+        # there are only 1 CPUs available" — and the whole stack fails to come
+        # up. This was 1.5, which is invalid on any single-core host.
+        #
+        # These are CEILINGS, not reservations, so they may safely sum to more
+        # than the host has: each says "no more than this", not "set this
+        # aside". On one core, leaving a little headroom below 1.0 keeps the
+        # API responsive while a long query runs.
+        limits:
+          cpus: "${PG_CPUS:-0.7}"
+          memory: ${PG_MEMORY:-640M}
 
   fincalc_redis:
     image: redis:7.4-alpine
@@ -67,7 +89,7 @@ services:
     logging: *default-logging
     command: >
       redis-server
-        --maxmemory 192mb
+        --maxmemory ${REDIS_MAXMEMORY:-96mb}
         --maxmemory-policy allkeys-lru
         --appendonly yes
         --appendfsync everysec
@@ -85,7 +107,9 @@ services:
     networks: [fincalc_net]
     deploy:
       resources:
-        limits: { cpus: "0.4", memory: 256M }
+        limits:
+          cpus: "${REDIS_CPUS:-0.3}"
+          memory: ${REDIS_MEMORY:-160M}
 
   # One-shot: runs migrations to completion, then exits. fincalc_api waits on it
   # so N replicas can never race Prisma's advisory lock (docs 08 §5).
@@ -143,7 +167,11 @@ services:
     networks: [fincalc_net, fincalc_edge]
     deploy:
       resources:
-        limits: { cpus: "1.0", memory: 512M }
+        limits:
+          # 0.9 rather than 1.0 on a single-core host: leaving a sliver keeps
+          # the machine responsive enough to SSH in when the API is saturated.
+          cpus: "${API_CPUS:-0.9}"
+          memory: ${API_MEMORY:-384M}
 
 networks:
   # Data services live here and have NO route to the internet.
