@@ -55,7 +55,7 @@ const schema = z.object({
    */
   JWT_SIGNING_KEYS: z.string().optional(),
   JWT_CURRENT_KID: z.string().default('k1'),
-  JWT_ISSUER: z.string().default('https://api.fincalc.app'),
+  JWT_ISSUER: z.string().default('https://fincalc.vamigo.in'),
   JWT_AUDIENCE: z.string().default('fincalc-app'),
   ACCESS_TOKEN_TTL_S: z.coerce.number().int().default(15 * 60),
   REFRESH_TOKEN_TTL_S: z.coerce.number().int().default(30 * 24 * 3600),

@@ -118,24 +118,103 @@ left old sessions alive would not actually lock anyone out.
 
 ---
 
-## Putting it behind a domain
+## Putting it on `fincalc.vamigo.in`
 
-The API binds to `127.0.0.1:8087` and speaks plain HTTP. Terminate TLS at the host's existing reverse
-proxy:
+The API binds to `127.0.0.1:8087` and speaks plain HTTP. It never terminates TLS itself — that is the
+host's reverse proxy's job, and it already has one.
+
+### 1. DNS
+
+An **A record** for `fincalc` on `vamigo.in`, pointing at the VPS's public IPv4. Add an **AAAA** too
+if the box has IPv6, or clients on v6-only networks will fail in ways that look like an app bug.
+
+Wait for it to resolve before asking for a certificate — Let's Encrypt validates over HTTP and will
+fail against a stale record:
+
+```bash
+dig +short fincalc.vamigo.in
+```
+
+### 2. nginx
 
 ```nginx
-location / {
-    proxy_pass http://127.0.0.1:8087;
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+server {
+    listen 80;
+    listen [::]:80;
+    server_name fincalc.vamigo.in;
+
+    # certbot writes its challenge here; everything else goes to HTTPS.
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name fincalc.vamigo.in;
+
+    ssl_certificate     /etc/letsencrypt/live/fincalc.vamigo.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fincalc.vamigo.in/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # The API sets its own security headers via helmet. Do not duplicate them
+    # here — two sources for one header is how they end up contradicting.
+
+    # Report bodies and sync batches are the largest things sent; 256kb matches
+    # BODY_LIMIT so a rejection comes from the API with a readable error rather
+    # than from nginx with a bare 413.
+    client_max_body_size 256k;
+
+    location / {
+        proxy_pass http://127.0.0.1:8087;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Longer than the API's own 15s REQUEST_TIMEOUT_MS, so the API decides
+        # when a request has taken too long and can say why.
+        proxy_read_timeout 30s;
+    }
 }
 ```
 
-`X-Forwarded-For` matters: rate limiting and the audit log record an IP **prefix**, and without the
-header every request looks like it came from the proxy — which turns per-IP limits into one shared
-bucket for the whole internet.
+`X-Forwarded-For` is not optional. Rate limiting and the audit log record an IP **prefix**, and
+without the header every request looks like it came from the proxy — which turns per-IP limits into
+one shared bucket for the entire internet, and makes the audit log useless. The API already runs with
+`trust proxy = 1`, which trusts exactly one hop: the proxy in front of it, and nothing further out.
+
+### 3. Certificate
+
+```bash
+sudo certbot --nginx -d fincalc.vamigo.in
+```
+
+Certbot installs a renewal timer. Confirm it works now rather than discovering it in 90 days:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+### 4. Check it end to end
+
+```bash
+curl -s https://fincalc.vamigo.in/v1/health/ready
+```
+
+Then confirm the app's own path works, since that is what actually matters:
+
+```bash
+curl -s -X POST https://fincalc.vamigo.in/v1/calculators/sip/compute \
+  -H 'content-type: application/json' \
+  -d '{"targetPaise":"500000000","years":15,"expectedReturnMicro":120000}'
+```
+
+The admin dashboard is then at `https://fincalc.vamigo.in/admin`.
 
 ---
 
