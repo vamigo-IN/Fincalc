@@ -37,21 +37,40 @@ x-api-env: &api-env
   NODE_ENV: production
   DATABASE_URL: postgresql://fincalc_owner:${POSTGRES_PASSWORD:-fincalc_dev_only}@fincalc_postgres:5432/fincalc?schema=public
   REDIS_URL: redis://fincalc_redis:6379
-  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_LEVEL: ${LOG_LEVEL:-}
   EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY:-}
   # `:?` fails fast with a readable message instead of starting a container that
   # exits a second later.
   PASSWORD_PEPPER: ${PASSWORD_PEPPER:?set PASSWORD_PEPPER in .env}
   AUDIT_PEPPER: ${AUDIT_PEPPER:?set AUDIT_PEPPER in .env}
   JWT_SIGNING_KEYS: ${JWT_SIGNING_KEYS:?set JWT_SIGNING_KEYS in .env — see DEPLOY.md}
-  JWT_CURRENT_KID: ${JWT_CURRENT_KID:-k1}
-  JWT_ISSUER: ${JWT_ISSUER:-https://fincalc.vamigo.in}
-  JWT_AUDIENCE: ${JWT_AUDIENCE:-fincalc-app}
+  JWT_CURRENT_KID: ${JWT_CURRENT_KID:-}
+  JWT_ISSUER: ${JWT_ISSUER:-}
+  JWT_AUDIENCE: ${JWT_AUDIENCE:-}
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
   ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-  BCRYPT_COST: ${BCRYPT_COST:-11}
-  RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
-  RATE_LIMIT_WRITE_MAX: ${RATE_LIMIT_WRITE_MAX:-120}
+  # Reset a SPECIFIC admin with scripts/reset-admin.js; defaults to the first
+  # ADMIN_EMAILS entry when unset.
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+
+  # Everything below is `${VAR:-}` — empty when unset, which config.ts strips so
+  # the default in the Zod schema applies. Defaults are NOT repeated here on
+  # purpose: two copies drift, and then the running value stops matching the
+  # documented one.
+  #
+  # These were absent entirely, so setting any of them in .env did nothing under
+  # Docker — the file advertised tunables the container never received.
+  BCRYPT_COST: ${BCRYPT_COST:-}
+  RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-}
+  RATE_LIMIT_WRITE_MAX: ${RATE_LIMIT_WRITE_MAX:-}
+  ACCESS_TOKEN_TTL_S: ${ACCESS_TOKEN_TTL_S:-}
+  REFRESH_TOKEN_TTL_S: ${REFRESH_TOKEN_TTL_S:-}
+  MAX_DEVICES_PER_USER: ${MAX_DEVICES_PER_USER:-}
+  FREE_TIER_GOAL_LIMIT: ${FREE_TIER_GOAL_LIMIT:-}
+  FX_BASE_CURRENCY: ${FX_BASE_CURRENCY:-}
+  FX_FRESH_MINUTES: ${FX_FRESH_MINUTES:-}
+  REQUEST_TIMEOUT_MS: ${REQUEST_TIMEOUT_MS:-}
+  BODY_LIMIT: ${BODY_LIMIT:-}
 
 services:
   fincalc_postgres:

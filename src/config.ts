@@ -155,7 +155,21 @@ const schema = z.object({
   ADMIN_EMAILS: z.string().default(''),
 })
 
-const parsed = schema.safeParse(process.env)
+/**
+ * `KEY=` in a .env file yields '', not undefined — and an empty value is how
+ * people say "not set". Stripping empties here means every optional field falls
+ * back to its default in ONE place: this schema.
+ *
+ * That matters for docker-compose, which can only pass a variable through as
+ * `${KEY:-}`. Without this filter the alternative is repeating each default in
+ * the compose file, where the two copies drift and the running value stops
+ * matching the documented one.
+ */
+const rawEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([, v]) => v !== ''),
+)
+
+const parsed = schema.safeParse(rawEnv)
 
 if (!parsed.success) {
   const issues = parsed.error.issues
