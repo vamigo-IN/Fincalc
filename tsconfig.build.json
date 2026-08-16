@@ -1,14 +1,24 @@
 {
   "extends": "./tsconfig.json",
+  // The OPERATIONAL scripts are compiled into dist on purpose. The runtime image
+  // copies only dist/, prisma/, node_modules/ and package.json — scripts/ is not
+  // there, and tsx is a devDependency that `npm prune --omit=dev` removes. So the
+  // `npx tsx scripts/reset-admin.ts` that the seed used to print could never have
+  // worked inside the container: no file, no tsx.
+  //
+  // emit-golden-vectors.ts is deliberately NOT listed: it is a development tool
+  // that reads test fixtures, and it has no business in a production image.
   "include": [
     "src/**/*.ts",
-    "prisma/seed.ts"
+    "prisma/seed.ts",
+    "scripts/reset-admin.ts",
+    "scripts/generate-signing-key.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "test",
     ".scratch",
-    "scripts"
+    "scripts/emit-golden-vectors.ts"
   ]
 }

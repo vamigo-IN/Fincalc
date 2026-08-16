@@ -128,8 +128,9 @@ async function derivePublicKey(privateKey: CryptoKey): Promise<CryptoKey> {
  */
 export async function initSigningKeys(): Promise<void> {
   if (config.JWT_SIGNING_KEYS) {
-    const parsed = JSON.parse(config.JWT_SIGNING_KEYS) as Record<string, string>
-    for (const [kid, pkcs8b64] of Object.entries(parsed)) {
+    // Already parsed and shape-checked in config.ts, so this cannot throw on a
+    // malformed value. It used to JSON.parse here — after the port was open.
+    for (const [kid, pkcs8b64] of Object.entries(config.JWT_SIGNING_KEYS)) {
       const pem = Buffer.from(pkcs8b64, 'base64').toString('utf8')
       const privateKey = (await importPKCS8(pem, 'EdDSA', { extractable: true })) as CryptoKey
       keys.set(kid, { kid, privateKey, publicKey: await derivePublicKey(privateKey) })

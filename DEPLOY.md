@@ -35,18 +35,27 @@ openssl rand -base64 48   # AUDIT_PEPPER
 `PASSWORD_PEPPER` is mixed into every password hash. **Rotating it invalidates every existing
 password.** Treat it as permanent and back it up somewhere you would back up a database.
 
-The JWT signing key is an Ed25519 JWK array:
+The JWT signing key is a JSON **object** mapping kid → base64 of a PKCS8 PEM:
 
 ```bash
-node --input-type=module -e "
-import { generateKeyPair, exportJWK } from 'jose';
-const { privateKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519', extractable: true });
-const jwk = await exportJWK(privateKey);
-console.log(JSON.stringify([{ kid: 'k1', ...jwk }]));
-"
+echo "JWT_SIGNING_KEYS={\"k1\":\"$(openssl genpkey -algorithm ed25519 | base64 -w0)\"}"
 ```
 
-Put the output in `JWT_SIGNING_KEYS` and leave `JWT_CURRENT_KID=k1`.
+Paste that whole line into `.env` and leave `JWT_CURRENT_KID=k1`.
+
+> **This section previously described a JWK array** (`[{"kid":"k1","kty":"OKP",…}]`). That is the
+> wrong shape — it parses as JSON and then fails inside the key import, so the API bound its port,
+> logged `listening`, and died. `restart: unless-stopped` then repeated that once a minute. The value
+> is validated at startup now, so a wrong shape is a readable boot error instead.
+
+**Rotation** — add the new key alongside the old so tokens signed with the old one still verify:
+
+```bash
+npm run keygen -- --add k2      # prints both keys plus the new JWT_CURRENT_KID
+```
+
+Drop the retired kid only after every token signed with it has expired (`REFRESH_TOKEN_TTL_S`,
+30 days by default). Removing it earlier signs every user out at once.
 
 ### 3. Write `.env`
 
@@ -122,7 +131,7 @@ nothing to sign in as.
 
 ```bash
 # Creates or resets the admin, verifies it, and revokes existing sessions.
-docker compose exec fincalc_api npx tsx scripts/reset-admin.ts
+docker compose exec fincalc_api node dist/scripts/reset-admin.js
 ```
 
 With `ADMIN_PASSWORD` unset it generates one and prints it **once**. In production the seed refuses to

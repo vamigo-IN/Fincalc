@@ -68,6 +68,38 @@ app.use(notFound)
 app.use(errorHandler)
 
 // ── lifecycle ────────────────────────────────────────────────────────────────
+
+/**
+ * SIGNING KEYS BEFORE THE PORT OPENS.
+ *
+ * This was `app.listen(...)` followed by a floating `void initSigningKeys()`,
+ * which is wrong in both directions. On a bad key the process logged "FinCalc
+ * API listening", bound the port, and only then died — so the logs said the API
+ * had started when it had not. On a key that merely loaded slowly, the port was
+ * open and accepting requests while `keys` was still empty, and every sign or
+ * verify in that window failed for no visible reason.
+ *
+ * Awaiting is cheap (one Ed25519 import) and makes "listening" mean it.
+ *
+ * Redis and Postgres stay non-blocking below on purpose: they reconnect on their
+ * own and /v1/health/ready reports them honestly, so a slow database delays
+ * readiness rather than preventing startup. A missing signing key is not
+ * transient and cannot be recovered from at runtime.
+ */
+try {
+  await initSigningKeys()
+} catch (err) {
+  // console, not logger: this must be readable in `docker compose logs` even if
+  // the failure is early enough that structured logging is noise.
+  console.error(
+    '\nFinCalc API cannot start — JWT_SIGNING_KEYS could not be loaded:\n' +
+      `  ${err instanceof Error ? err.message : String(err)}\n\n` +
+      '  The value is well-formed but the key itself was rejected.\n' +
+      '  Generate a fresh one with: npm run keygen\n',
+  )
+  process.exit(1)
+}
+
 const server = app.listen(config.PORT, () => {
   logger.info(
     { port: config.PORT, env: config.NODE_ENV },
@@ -77,7 +109,6 @@ const server = app.listen(config.PORT, () => {
 
 void connectRedis()
 void connectPrisma()
-void initSigningKeys()
 
 /**
  * Graceful shutdown. Node does not forward signals or reap children on its own,

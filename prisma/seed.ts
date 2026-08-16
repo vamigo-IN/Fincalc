@@ -56,8 +56,11 @@ async function seedAdmin(): Promise<string> {
     // anyone with log access.
     return (
       'admin NOT created — ADMIN_PASSWORD is unset and one will not be ' +
-      'generated in production. Create it with: ' +
-      'docker compose exec fincalc_api npx tsx scripts/reset-admin.ts'
+      'generated in production. Create it with:\n' +
+      // `node dist/…`, NOT `npx tsx scripts/…`: the runtime image copies only
+      // dist/, prisma/, node_modules/ and package.json, and `npm prune
+      // --omit=dev` removes tsx. The tsx form printed here before could not run.
+      '  docker compose exec fincalc_api node dist/scripts/reset-admin.js'
     )
   }
 

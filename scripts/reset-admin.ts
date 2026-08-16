@@ -1,8 +1,17 @@
 /**
  * Reset the admin account's password.
  *
- *   npx tsx scripts/reset-admin.ts                 # generates one, prints it once
- *   ADMIN_PASSWORD='...' npx tsx scripts/reset-admin.ts
+ * On the VPS, against the running stack:
+ *   docker compose exec fincalc_api node dist/scripts/reset-admin.js
+ *   docker compose exec -e ADMIN_PASSWORD='…' fincalc_api node dist/scripts/reset-admin.js
+ *
+ * From a checkout:
+ *   npm run reset-admin
+ *   ADMIN_PASSWORD='…' npm run reset-admin
+ *
+ * The container form is `node dist/…` because the runtime image has neither
+ * tsx (pruned with the dev dependencies) nor scripts/ (never copied); this file
+ * is compiled into dist by tsconfig.build.json for exactly that reason.
  *
  * Exists because the seed is deliberately idempotent — it will not touch an
  * existing admin's password, so a deploy can never silently reset the account
