@@ -1,0 +1,29 @@
+# Server-local ignores.
+#
+# These duplicate the `server/`-prefixed rules in the monorepo's root
+# .gitignore, and they exist because THIS DIRECTORY IS ALSO PUBLISHED ON ITS
+# OWN. `git subtree split --prefix=server` makes server/ the repository root,
+# and the root .gitignore does not come with it — so without this file the
+# deploy repo would have no rule stopping `.env`, with real JWT keys, the
+# password pepper and the database password, from being committed.
+#
+# Keep the two in step. A rule added to only one of them protects only one repo.
+
+node_modules/
+dist/
+build/
+
+# Secrets. .env.example is the template and IS tracked.
+.env
+.env.*
+!.env.example
+
+# Local scratch and generated artefacts
+.scratch/
+*.log
+coverage/
+.DS_Store
+
+# Prisma generates the client into node_modules; nothing to track here, but a
+# local engine download can land in prisma/ on some platforms.
+prisma/*.node
