@@ -27,3 +27,8 @@ coverage/
 # Prisma generates the client into node_modules; nothing to track here, but a
 # local engine download can land in prisma/ on some platforms.
 prisma/*.node
+
+# tsx resolves its cache under $TMPDIR. On Windows that variable is sometimes
+# unset, and the literal string "undefined" becomes the directory name — which
+# is how a tree of compile-cache blobs once got committed here.
+undefined/

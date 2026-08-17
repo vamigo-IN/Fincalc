@@ -7,89 +7,24 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { uuidv7 } from 'uuidv7'
-import { randomBytes } from 'node:crypto'
-
-import { config } from '../src/config.js'
-import { hashPassword } from '../src/modules/auth/crypto.js'
 
 const db = new PrismaClient()
 
 /**
- * The admin account.
+ * THE SEED DOES NOT CREATE ADMIN ACCOUNTS.
  *
- * Admin is granted by the ADMIN_EMAILS allowlist, but nothing was ever creating
- * a USER with such an email — so the dashboard was unreachable: the allowlist
- * matched an account that did not exist.
+ * It used to, from ADMIN_PASSWORD or a generated value. That was removed
+ * deliberately: an automated path that mints a credential able to read every
+ * user's financial data is a path that runs on every deploy, from a value
+ * sitting in .env, printed into a log nobody rotates.
  *
- * NO PASSWORD IS HARDCODED HERE, deliberately. A default committed to a repo is
- * a default that reaches production, and this account can read every user's
- * financial data. Instead:
+ * There is now exactly one way to change an admin password — signed in, from
+ * /admin/account, having proved you already hold the current one. Creating the
+ * FIRST admin on a fresh database is a deliberate one-time SQL step, documented
+ * in DEPLOY.md, because it should be rare, manual and auditable.
  *
- *   - `ADMIN_PASSWORD` in the environment is used if set;
- *   - otherwise one is GENERATED and printed once, in this log line only;
- *   - in production a generated password is refused outright, because a
- *     credential that exists only in a deploy log is a credential nobody can
- *     rotate and everybody can read.
- *
- * Idempotent like the rest of the seed: an existing admin keeps its password,
- * so re-running a deploy never silently resets it.
+ * ADMIN_EMAILS still controls who MAY be an admin; it grants nothing on its own.
  */
-async function seedAdmin(): Promise<string> {
-  const email = [...config.adminEmails][0]
-  if (!email) {
-    return 'no ADMIN_EMAILS set — admin dashboard has no account'
-  }
-
-  const existing = await db.user.findFirst({ where: { email } })
-  if (existing) return `admin ${email} already exists (password unchanged)`
-
-  const supplied = process.env.ADMIN_PASSWORD?.trim()
-
-  if (!supplied && config.isProd) {
-    // SKIPPED, not thrown. This runs inside fincalc_migrate, which the API
-    // waits on: throwing here fails the container, and a missing OPTIONAL
-    // admin password would then block the entire deploy — migrations applied,
-    // API never started, over an account nobody asked for yet.
-    //
-    // Still refusing to generate one, for the original reason: a credential
-    // that exists only in a deploy log cannot be rotated and can be read by
-    // anyone with log access.
-    return (
-      'admin NOT created — ADMIN_PASSWORD is unset and one will not be ' +
-      'generated in production. Create it with:\n' +
-      // `node dist/…`, NOT `npx tsx scripts/…`: the runtime image copies only
-      // dist/, prisma/, node_modules/ and package.json, and `npm prune
-      // --omit=dev` removes tsx. The tsx form printed here before could not run.
-      '  docker compose exec fincalc_api node dist/scripts/reset-admin.js'
-    )
-  }
-
-  // 24 bytes of base64url ≈ 192 bits. Long enough that the printed value being
-  // the only copy is survivable in development.
-  const password = supplied ?? randomBytes(24).toString('base64url')
-
-  if (password.length < 12) {
-    throw new Error('ADMIN_PASSWORD must be at least 12 characters.')
-  }
-
-  await db.user.create({
-    data: {
-      id: uuidv7(),
-      email,
-      passwordHash: await hashPassword(password),
-      // Verified on creation: there is no inbox for a seeded account, and an
-      // unverified admin cannot sign in to fix its own verification.
-      emailVerifiedAt: new Date(),
-      profile: { create: {} },
-      syncState: { create: {} },
-    },
-  })
-
-  return supplied
-    ? `admin ${email} created with the supplied ADMIN_PASSWORD`
-    : `admin ${email} created — PASSWORD: ${password}\n` +
-        '  ^ shown once. Store it now, then set ADMIN_PASSWORD or change it in the app.'
-}
 
 /**
  * The 18 system expense categories.
@@ -209,11 +144,9 @@ async function main(): Promise<void> {
   const categories = await seedExpenseCategories()
   const learning = await seedLearningCategories()
   const flags = await seedFeatureFlags()
-  const admin = await seedAdmin()
   console.log(
     `seed ok — ${categories} expense categories, ${learning} learning categories, ${flags} feature flags`,
   )
-  console.log(admin)
 }
 
 main()

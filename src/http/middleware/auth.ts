@@ -81,7 +81,15 @@ export const requireAdmin: RequestHandler = (req, _res, next) => {
 
 // ── rate limiting ────────────────────────────────────────────────────────────
 
-export type Bucket = 'auth' | 'refresh' | 'read' | 'write' | 'compute' | 'sync' | 'report'
+export type Bucket =
+  | 'auth'
+  | 'refresh'
+  | 'read'
+  | 'write'
+  | 'compute'
+  | 'sync'
+  | 'report'
+  | 'feed'
 
 /** docs/fincalc-2.0/07 §1. Per user where we know them, per IP otherwise. */
 const LIMITS: Record<Bucket, { max: number; windowS: number }> = {
@@ -92,6 +100,13 @@ const LIMITS: Record<Bucket, { max: number; windowS: number }> = {
   compute: { max: 60, windowS: 60 },
   sync: { max: 30, windowS: 60 },
   report: { max: 10, windowS: 3600 },
+  /**
+   * Market-feed tokens. Tight on purpose: this endpoint mints a credential, and
+   * an honest client needs one per 15-minute token — call it four an hour, plus
+   * reconnects. Twenty an hour leaves generous headroom while making the
+   * endpoint useless as a way to farm feed connections in bulk.
+   */
+  feed: { max: 20, windowS: 3600 },
 }
 
 /**

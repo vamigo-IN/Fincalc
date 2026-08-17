@@ -32,6 +32,7 @@ export const ERROR_CATALOGUE = {
   CALCULATOR_UNKNOWN:       { status: 404, message: "That calculator isn't available." },
   RULESET_NOT_FOUND:        { status: 404, message: "Tax rules for that year aren't available yet." },
   RATES_UNAVAILABLE:        { status: 503, message: 'Exchange rates are temporarily unavailable.' },
+  FEED_UNAVAILABLE:         { status: 503, message: 'Live market prices are temporarily unavailable.' },
   IDEMPOTENCY_KEY_REUSED:   { status: 409, message: 'This request was already processed.' },
   RATE_LIMITED:             { status: 429, message: 'Please slow down and try again shortly.' },
   MINIMUM_VERSION_REQUIRED: { status: 426, message: 'Please update FinCalc to continue.' },

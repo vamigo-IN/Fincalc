@@ -96,8 +96,8 @@ stops; a stopped `fincalc_migrate` in `docker ps -a` is the expected end state. 
 is empty and the API has nothing to talk to.
 
 It runs `prisma migrate deploy` followed by the seed, which inserts the 18 expense categories, the
-learning categories, the feature flags and — if `ADMIN_PASSWORD` is set — the admin account. Every
-statement is an upsert on a natural key, so running it again on an existing database changes nothing.
+learning categories and the feature flags. It does **not** create any account. Every statement is an
+upsert on a natural key, so running it again on an existing database changes nothing.
 It exists as a separate one-shot container rather than as a step inside the API so that N API replicas
 can never race each other for Prisma's advisory lock.
 
@@ -123,20 +123,180 @@ never resets and never drops.
 
 ---
 
+## The live market feed
+
+Six Indian indices (Nifty 50, Bank Nifty, Nifty Financial, Nifty Next 50, Sensex, BSE Bankex) and four
+MCX commodities (Gold, Silver, Crude Oil, Natural Gas), streamed over Socket.IO from the StockVirtue
+backend's `/fincalc` namespace.
+
+**Prices never pass through this server.** The app connects to the feed directly. This server's only
+job is to mint a short-lived signed token, because a shipped APK cannot keep a secret — anyone who
+unpacks the binary reads a key compiled into it, and revoking it would mean a Play Store release for
+every existing install.
+
+```
+FinCalc app ──GET /v1/market/feed──▶ this server   (mint sv1.… token, 15 min)
+     └────────wss + token──────────▶ api.stockvirtue.com/fincalc
+```
+
+### Setup
+
+**1.** On the **StockVirtue** backend, generate the pair and enable the feed:
+
+```bash
+node -e "console.log('fincalc-app:'+require('crypto').randomBytes(32).toString('base64url'))"
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+```bash
+# stockvirtue backend/.env
+FEED_ENABLED=true
+FEED_API_KEYS=fincalc-app:<first line>
+FEED_TOKEN_SECRET=<second line>
+FEED_REQUIRE_SIGNED_TOKENS=false   # flip to true once FinCalc is minting
+```
+
+```bash
+npm run build && pm2 restart stockvirtue-api
+```
+
+Two log lines confirm it:
+
+```
+[FeedGateway] Public market feed live on /fincalc — 10 instruments, 1000ms broadcast
+[FeedService] Feed universe resolved: 10/10 instruments (+10 / -0)
+```
+
+**2.** On **this** server, set the same secret:
+
+```bash
+# fincalc/.env
+FEED_TOKEN_SECRET=<the SAME second line>
+```
+
+```bash
+docker compose up -d
+curl -s https://fincalc.vamigo.in/v1/market/feed | jq
+```
+
+**3.** Once prices appear in the app, set `FEED_REQUIRE_SIGNED_TOKENS=true` on the StockVirtue backend
+and restart. Raw keys stop being accepted entirely from that point.
+
+> Keep `fincalc-app` in the feed server's `FEED_API_KEYS` even in signed-token-only mode — it checks
+> the client id is known **before** it checks the signature. Its secret simply stops being usable.
+
+### Things that will bite
+
+| | |
+|---|---|
+| `FEED_CLIENT_ID` containing a `.` | The dot is the token field separator. The feed reads a different client id and refuses. Rejected at mint time here rather than becoming a mystery `unauthorized`. |
+| Secrets not identical on both sides | Every connection refused. `unauthorized` says nothing about why, on purpose — it is not an oracle for guessing a key. |
+| `expiresAt` in milliseconds | Would mint a token valid until the year 58000. Pinned by a test; seconds only. |
+| nginx not upgrading WebSockets | Already fine if StockVirtue's own live prices work — both namespaces share `/socket.io/`. |
+
+### Rotating or revoking
+
+Change `FEED_TOKEN_SECRET` on both sides and restart both. Outstanding tokens die within 15 minutes
+with no app release. To cut FinCalc off entirely, remove its `clientId:secret` from the feed server's
+`FEED_API_KEYS`; existing sockets survive until they reconnect, so restart that process to drop them.
+
+`FEED_ENABLED=false` there, or an unset `FEED_TOKEN_SECRET` here, disables the feature cleanly — this
+endpoint then returns 503 and the app falls back to its cached FX strip rather than an empty screen.
+
+---
+
 ## The admin account
 
 The dashboard at `/admin` is gated by `ADMIN_EMAILS`, but that allowlist grants a **role** — it does
 not create a user. An email on the list with no matching account cannot sign in, because there is
 nothing to sign in as.
 
+**Nothing in this stack creates or resets an admin password automatically.** There is no
+`ADMIN_PASSWORD`, no seeded account and no `reset-admin` script. Those all existed and were removed on
+purpose: each one meant that shell access to the container, or a value sitting in `.env`, was enough
+to take over the account that can read every user's financial data.
+
+### Changing your password
+
+Sign in, go to **`/admin/account`**, and enter your current password alongside the new one. That is
+the only path.
+
+Changing it signs out **every** admin session including your own, and revokes the account's app
+refresh tokens — so if someone else had access, they lose it at that moment.
+
+### Creating the first admin on a fresh database
+
+A deliberate one-time SQL step. It is rare, manual and shows up in the database's own audit trail,
+which is the point.
+
+**1.** Generate a bcrypt hash of your chosen password. It must be **peppered exactly as the API does
+it** — HMAC-SHA256 with `PASSWORD_PEPPER`, base64, then bcrypt — or the hash will never verify:
+
 ```bash
-# Creates or resets the admin, verifies it, and revokes existing sessions.
-docker compose exec fincalc_api node dist/scripts/reset-admin.js
+docker compose exec fincalc_api node -e '
+const c = require("crypto"), b = require("bcryptjs");
+const pw = process.argv[1], pepper = process.env.PASSWORD_PEPPER;
+if (!pw || pw.length < 10) { console.error("Pass a password of at least 10 characters."); process.exit(1); }
+if (!pepper) { console.error("PASSWORD_PEPPER is not set in this container."); process.exit(1); }
+const peppered = c.createHmac("sha256", pepper).update(pw).digest("base64");
+console.log(b.hashSync(peppered, Number(process.env.BCRYPT_COST || 11)));
+' 'your-chosen-password'
 ```
 
-With `ADMIN_PASSWORD` unset it generates one and prints it **once**. In production the seed refuses to
-generate: a credential that exists only in a deploy log cannot be rotated and can be read by anyone
-with log access. Set `ADMIN_PASSWORD` to a value you control.
+**2.** Insert the account, using the hash from step 1:
+
+```bash
+docker compose exec -T fincalc_postgres psql -U fincalc_owner -d fincalc -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+WITH new_admin AS (
+  INSERT INTO users (id, email, password_hash, email_verified_at, status)
+  VALUES (uuidv7(), 'admin@vamigo.in', '<PASTE THE HASH FROM STEP 1>', now(), 'active')
+  RETURNING id
+), profile AS (
+  INSERT INTO user_profiles (id, user_id) SELECT uuidv7(), id FROM new_admin
+)
+-- sync_state is written too: Prisma normally creates it alongside the account,
+-- and the mobile app's first sync expects the row to exist.
+INSERT INTO sync_state (user_id, updated_at) SELECT id, now() FROM new_admin;
+COMMIT;
+SQL
+```
+
+`email_verified_at` is set because there is no inbox for this account, and an unverified admin cannot
+sign in to verify itself. `-T` disables TTY allocation so the heredoc reaches `psql`.
+
+**3.** Confirm the address is in `ADMIN_EMAILS` in `.env`, then sign in at `/admin` and change the
+password from `/admin/account` so the value you typed into a shell is no longer the live one.
+
+### If the password is lost
+
+There is **no recovery path short of the database** — that is the deliberate cost of removing the
+reset script. Repeat the two steps above with a fresh hash, using `UPDATE` instead of `INSERT`:
+
+```sql
+UPDATE users
+   SET password_hash = '<NEW HASH>',
+       password_changed_at = now(),
+       failed_login_count = 0,
+       locked_until = NULL,
+       status = 'active'
+ WHERE email = 'admin@vamigo.in';
+```
+
+Then clear the account's sessions so nothing survives the reset:
+
+```bash
+docker compose exec fincalc_redis redis-cli --scan --pattern 'admin:sess:*' | xargs -r docker compose exec -T fincalc_redis redis-cli DEL
+```
+
+### Locked out by failed attempts
+
+Five failures locks the account for an escalating period, capped at 15 minutes — just wait, or clear
+it directly:
+
+```sql
+UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE email = 'admin@vamigo.in';
+```
 
 Resetting bumps `passwordChangedAt` and revokes refresh tokens, so existing sessions die — a reset that
 left old sessions alive would not actually lock anyone out.
@@ -365,6 +525,12 @@ ever be verified again — a database backup without it is unusable for logging 
 | Exits at boot naming a variable | That variable is missing from `.env`. The message says which. |
 | Exits complaining about a port | A blocked port is set in `.env`. Pick another. |
 | `/health/ready` reports postgres down | `fincalc_migrate` may not have run; check `docker compose ps`. |
-| Admin login fails for an allowlisted email | The account does not exist. Run `reset-admin.ts`. |
+| Admin login fails for an allowlisted email | The account does not exist. See "Creating the first admin". |
+| Admin login says "Those details did not work" for a correct password | Five failures locks the account for up to 15 minutes. Wait, or clear `locked_until`. |
+| Admin login says "Too many attempts" | Per-IP ceiling: 10 attempts per 15 minutes. |
+| Admin POST returns "CSRF check failed" | The page was loaded before a sign-out/sign-in. Reload and retry. |
+| Admin redirected to login on every request | Redis is down — sessions fail closed. Check `docker compose ps fincalc_redis`. |
+| `/v1/market/feed` returns 503 | `FEED_TOKEN_SECRET` is unset here. The log line is `feed.not_configured`. |
+| Feed connects then immediately closes with `unauthorized` | Secret mismatch, or `fincalc-app` missing from the feed server's `FEED_API_KEYS`. |
 | `RATES_UNAVAILABLE` | No `EXCHANGERATE_API_KEY`, or upstream is down and the cache is cold. The API says so rather than serving a made-up rate. |
 | Every request rate-limited together | The proxy is not sending `X-Forwarded-For`. |

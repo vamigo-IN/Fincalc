@@ -1,17 +1,19 @@
 {
   "extends": "./tsconfig.json",
-  // The OPERATIONAL scripts are compiled into dist on purpose. The runtime image
-  // copies only dist/, prisma/, node_modules/ and package.json — scripts/ is not
-  // there, and tsx is a devDependency that `npm prune --omit=dev` removes. So the
-  // `npx tsx scripts/reset-admin.ts` that the seed used to print could never have
-  // worked inside the container: no file, no tsx.
+  // NO SCRIPT IN THE RUNTIME IMAGE CAN TOUCH AN ADMIN CREDENTIAL.
   //
-  // emit-golden-vectors.ts is deliberately NOT listed: it is a development tool
-  // that reads test fixtures, and it has no business in a production image.
+  // reset-admin.ts was compiled in here so it could be run with
+  // `docker compose exec`. It is gone: shell access to the container should not
+  // be a way to mint or reset the account that reads every user's finances.
+  // Password changes happen at /admin/account, signed in, with the current
+  // password; the first admin on a fresh database is one-time SQL (DEPLOY.md).
+  //
+  // generate-signing-key.ts is a pure key generator that touches no account and
+  // no database, so it stays. emit-golden-vectors.ts is excluded as a dev tool
+  // that reads test fixtures.
   "include": [
     "src/**/*.ts",
     "prisma/seed.ts",
-    "scripts/reset-admin.ts",
     "scripts/generate-signing-key.ts"
   ],
   "exclude": [

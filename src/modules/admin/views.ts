@@ -91,6 +91,7 @@ export function layout(title: string, activeNav: string, body: string): string {
     ['/admin/rules', 'Advisor rules'],
     ['/admin/flags', 'Feature flags'],
     ['/admin/system', 'System'],
+    ['/admin/account', 'Account'],
   ]
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -124,6 +125,40 @@ export function loginPage(error?: string): string {
   <button type="submit">Sign in</button>
   <p class="note" style="margin-bottom:0">Only accounts listed in <code>ADMIN_EMAILS</code> may sign in.</p>
 </form></body></html>`
+}
+
+/**
+ * Change your own password.
+ *
+ * The only way to change an admin password now that scripts/reset-admin.ts is
+ * gone. It requires the current password, so a session left open on an
+ * unattended machine cannot be turned into a permanent takeover.
+ */
+export function accountPage(
+  session: { email: string; csrf: string },
+  error?: string,
+  notice?: string,
+): string {
+  return layout('Account', '/admin/account', `
+    <h1>Account</h1>
+    <p class="note">Signed in as <code>${esc(session.email)}</code>.</p>
+
+    <h2>Change password</h2>
+    ${error ? `<div class="err">${esc(error)}</div>` : ''}
+    ${notice ? `<div class="note" style="color:var(--ok)">${esc(notice)}</div>` : ''}
+    <form method="post" action="/admin/account/password" style="max-width:380px">
+      <input type="hidden" name="_csrf" value="${esc(session.csrf)}">
+      <input name="current" type="password" required placeholder="Current password"
+             autocomplete="current-password" style="width:100%;margin-bottom:.7rem">
+      <input name="next" type="password" required minlength="10" placeholder="New password"
+             autocomplete="new-password" style="width:100%;margin-bottom:.7rem">
+      <input name="confirm" type="password" required minlength="10" placeholder="Confirm new password"
+             autocomplete="new-password" style="width:100%;margin-bottom:.7rem">
+      <button type="submit">Change password</button>
+    </form>
+    <p class="note">At least 10 characters. Changing it signs out every admin session,
+    including this one, and revokes the account's app refresh tokens — so if someone else
+    had access, they lose it immediately. You will be asked to sign in again.</p>`)
 }
 
 export function card(k: string, v: string, s = ''): string {

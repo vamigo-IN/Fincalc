@@ -43,6 +43,30 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   }
 }
 
+/**
+ * Spend the same time as a real verification, for a login attempt against an
+ * account that does not exist.
+ *
+ * Returning early when no user matches is an oracle: a real admin email costs
+ * ~155ms in bcrypt while an unknown one answers instantly, which tells an
+ * attacker which address to start guessing against.
+ *
+ * The hash is GENERATED at first use rather than written as a literal. A
+ * hand-written constant that bcrypt considers malformed makes `compare` fail
+ * immediately — the fast path this exists to avoid, and it would have looked
+ * correct in review.
+ */
+let dummyHash: Promise<string> | null = null
+
+export async function burnPasswordVerification(password: string): Promise<void> {
+  dummyHash ??= bcrypt.hash(pepper(randomBytes(32).toString('base64')), config.BCRYPT_COST)
+  try {
+    await bcrypt.compare(pepper(password), await dummyHash)
+  } catch {
+    /* the result is deliberately discarded; only the elapsed time matters */
+  }
+}
+
 /** The 100 most common passwords are worth more than any composition rule. */
 const COMMON = new Set([
   'password', '12345678', '123456789', 'qwerty123', 'password1', '1234567890',

@@ -47,11 +47,11 @@ x-api-env: &api-env
   JWT_CURRENT_KID: ${JWT_CURRENT_KID:-}
   JWT_ISSUER: ${JWT_ISSUER:-}
   JWT_AUDIENCE: ${JWT_AUDIENCE:-}
+  # Who MAY be an admin. Grants nothing on its own — the account must also exist
+  # with a password. There is deliberately no ADMIN_PASSWORD: nothing in this
+  # stack creates or resets an admin credential from the environment any more.
+  # Passwords are changed at /admin/account, signed in, with the current one.
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
-  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-  # Reset a SPECIFIC admin with scripts/reset-admin.js; defaults to the first
-  # ADMIN_EMAILS entry when unset.
-  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
 
   # Everything below is `${VAR:-}` — empty when unset, which config.ts strips so
   # the default in the Zod schema applies. Defaults are NOT repeated here on
@@ -71,6 +71,15 @@ x-api-env: &api-env
   FX_FRESH_MINUTES: ${FX_FRESH_MINUTES:-}
   REQUEST_TIMEOUT_MS: ${REQUEST_TIMEOUT_MS:-}
   BODY_LIMIT: ${BODY_LIMIT:-}
+
+  # Live market feed. FEED_TOKEN_SECRET unset = the feature is off and
+  # /v1/market/feed returns 503; it is deliberately NOT `:?` required, because a
+  # market ticker must not be able to stop the API from booting.
+  FEED_TOKEN_SECRET: ${FEED_TOKEN_SECRET:-}
+  FEED_CLIENT_ID: ${FEED_CLIENT_ID:-}
+  FEED_BASE_URL: ${FEED_BASE_URL:-}
+  FEED_TOKEN_TTL_S: ${FEED_TOKEN_TTL_S:-}
+  FEED_SYMBOLS: ${FEED_SYMBOLS:-}
 
 services:
   fincalc_postgres:

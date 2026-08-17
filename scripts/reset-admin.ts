@@ -1,108 +1,35 @@
 /**
- * Reset the admin account's password.
+ * REMOVED. This file is a tombstone and should be deleted:
  *
- * On the VPS, against the running stack:
- *   docker compose exec fincalc_api node dist/scripts/reset-admin.js
- *   docker compose exec -e ADMIN_PASSWORD='…' fincalc_api node dist/scripts/reset-admin.js
+ *   git rm server/scripts/reset-admin.ts
  *
- * From a checkout:
- *   npm run reset-admin
- *   ADMIN_PASSWORD='…' npm run reset-admin
+ * It used to create or reset the admin password from the command line. That
+ * meant shell access to the container — or to a checkout with DATABASE_URL —
+ * was enough to take over the account that can read every user's financial
+ * data, without ever knowing the existing password.
  *
- * The container form is `node dist/…` because the runtime image has neither
- * tsx (pruned with the dev dependencies) nor scripts/ (never copied); this file
- * is compiled into dist by tsconfig.build.json for exactly that reason.
+ * It is no longer compiled into the runtime image (tsconfig.build.json), the
+ * `reset-admin` npm script is gone, and the seed no longer creates accounts.
+ * The stub remains only because the deletion could not be completed in the same
+ * pass; it refuses to run so that an unpruned checkout is not a live bypass.
  *
- * Exists because the seed is deliberately idempotent — it will not touch an
- * existing admin's password, so a deploy can never silently reset the account
- * that can read every user's financial data. That leaves one real situation
- * uncovered: the password is lost. This is that escape hatch, and it is a
- * deliberate manual step rather than something a deploy does.
- *
- * It also VERIFIES the account. An admin seeded before email verification
- * existed cannot sign in and cannot verify itself, which is exactly the state
- * this database was in.
+ * WHAT TO USE INSTEAD
+ *   Change a password:  sign in, go to /admin/account, enter the current one.
+ *   First admin on a fresh database:  the one-time SQL in DEPLOY.md.
+ *   Lost password:      the UPDATE statement in DEPLOY.md, which needs database
+ *                       access — deliberately a higher bar than a script.
  */
-import { randomBytes } from 'node:crypto'
-
-import { PrismaClient } from '@prisma/client'
-
-import { config } from '../src/config.js'
-import { hashPassword } from '../src/modules/auth/crypto.js'
-
-const db = new PrismaClient()
-
-async function main(): Promise<void> {
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? [...config.adminEmails][0]
-
-  if (!email) {
-    throw new Error('No admin email. Set ADMIN_EMAILS in .env, or pass ADMIN_EMAIL.')
-  }
-  if (!config.adminEmails.has(email)) {
-    // Resetting a password for an account that is not on the allowlist would
-    // produce working credentials that still cannot reach the dashboard.
-    throw new Error(
-      `${email} is not in ADMIN_EMAILS, so it would not have admin access. ` +
-        `Current allowlist: ${[...config.adminEmails].join(', ') || '(empty)'}`,
-    )
-  }
-
-  const supplied = process.env.ADMIN_PASSWORD?.trim()
-  const password = supplied ?? randomBytes(18).toString('base64url')
-
-  if (password.length < 12) {
-    throw new Error('ADMIN_PASSWORD must be at least 12 characters.')
-  }
-
-  const user = await db.user.findFirst({ where: { email }, select: { id: true } })
-  const passwordHash = await hashPassword(password)
-
-  if (user) {
-    await db.$transaction([
-      db.user.update({
-        where: { id: user.id },
-        data: {
-          passwordHash,
-          // Bumping this is what invalidates existing sessions: any access token
-          // issued before now is rejected. A password reset that left old
-          // sessions alive would not actually lock anyone out.
-          passwordChangedAt: new Date(),
-          emailVerifiedAt: new Date(),
-          failedLoginCount: 0,
-          lockedUntil: null,
-          status: 'active',
-        },
-      }),
-      // Revoke refresh tokens for the same reason.
-      db.refreshToken.updateMany({
-        where: { userId: user.id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
-    ])
-    console.log(`admin ${email} — password reset, account verified, sessions revoked`)
-  } else {
-    const created = await db.user.create({
-      data: {
-        email,
-        passwordHash,
-        emailVerifiedAt: new Date(),
-        profile: { create: {} },
-        syncState: { create: {} },
-      },
-      select: { id: true },
-    })
-    console.log(`admin ${email} created (${created.id})`)
-  }
-
-  if (!supplied) {
-    console.log(`\n  PASSWORD: ${password}\n`)
-    console.log('  Shown once. Store it now and change it after signing in.')
-  }
-}
-
-main()
-  .catch((err) => {
-    console.error('reset-admin failed:', err instanceof Error ? err.message : err)
-    process.exitCode = 1
-  })
-  .finally(() => db.$disconnect())
+console.error(
+  [
+    '',
+    'reset-admin has been removed.',
+    '',
+    '  Change an admin password:  sign in and use /admin/account',
+    '                             (requires the current password)',
+    '  Create the first admin:    see "The admin account" in DEPLOY.md',
+    '',
+    'This file is a tombstone. Delete it:  git rm server/scripts/reset-admin.ts',
+    '',
+  ].join('\n'),
+)
+process.exit(1)

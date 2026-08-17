@@ -153,6 +153,47 @@ const schema = z.object({
 
   /** Comma-separated emails granted the admin claim. */
   ADMIN_EMAILS: z.string().default(''),
+
+  // ── live market feed (StockVirtue) ─────────────────────────────────────────
+  /**
+   * The app streams ten Indian indices and MCX commodities from the StockVirtue
+   * backend's /fincalc Socket.IO namespace. This server's only job is to MINT a
+   * short-lived signed token so the long-lived secret never ships in the APK —
+   * anyone who unpacks an APK can read a key compiled into it.
+   */
+  FEED_BASE_URL: z.string().url().default('https://api.stockvirtue.com'),
+
+  /**
+   * Must exist in the feed server's FEED_API_KEYS even in signed-token-only
+   * mode: it checks the id is known before it checks the signature.
+   */
+  FEED_CLIENT_ID: z.string().default('fincalc-app'),
+
+  /**
+   * The HMAC secret, matching FEED_TOKEN_SECRET on the feed server.
+   *
+   * Optional so the API boots without it — the endpoint then reports the feed
+   * as unconfigured and the app falls back to its cached FX strip, rather than
+   * the whole server refusing to start over a market ticker.
+   */
+  FEED_TOKEN_SECRET: z.preprocess(
+    (v) => (v === '' || v === undefined ? undefined : v),
+    z.string().min(16).optional(),
+  ),
+
+  /**
+   * Token lifetime. Short by design: a leaked token is only useful until it
+   * expires, and re-minting costs one cached HTTP call on app resume.
+   */
+  FEED_TOKEN_TTL_S: z.coerce.number().int().min(60).max(3600).default(900),
+
+  /**
+   * Which instruments the app subscribes to, comma-separated. Empty = all ten.
+   *
+   * Served to the client rather than compiled into it, so the strip's contents
+   * can change without a Play Store release.
+   */
+  FEED_SYMBOLS: z.string().default(''),
 })
 
 /**
@@ -205,6 +246,10 @@ export const config = Object.freeze({
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean),
   ),
+  /** Empty array = every instrument the feed carries. */
+  feedSymbols: parsed.data.FEED_SYMBOLS.split(',')
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean),
 })
 
 export type Config = typeof config

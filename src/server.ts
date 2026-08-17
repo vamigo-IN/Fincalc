@@ -7,6 +7,7 @@ import { connectPrisma, prismaHealthy, unsafeSystemClient } from './db/prisma.js
 import { initSigningKeys } from './modules/auth/crypto.js'
 import { requestId, ok, errorHandler, notFound, installBigIntSerialiser } from './http/envelope.js'
 import { fxRouter } from './modules/reference/fx.routes.js'
+import { marketRouter } from './modules/market/market.routes.js'
 import { sipRouter } from './modules/calculators/sip.routes.js'
 import { upstreamCallsToday } from './modules/reference/fx.service.js'
 import { authRouter, meRouter } from './modules/auth/auth.routes.js'
@@ -58,6 +59,7 @@ app.use('/v1/me', meRouter)
 app.use('/v1/goals', goalsRouter)
 app.use('/v1/sync', syncRouter)
 app.use('/v1/reference', fxRouter)
+app.use('/v1/market', marketRouter)
 app.use('/v1/calculators', sipRouter)
 
 // Server-rendered admin. Mounted OUTSIDE /v1 because it is not part of the
